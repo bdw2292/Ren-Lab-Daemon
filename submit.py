@@ -155,7 +155,7 @@ def CheckGPUStats(node):
         p = subprocess.Popen(job, stdout=subprocess.PIPE,shell=True)
         nodedead,output=CheckForDeadNode(p,node)
     cudaversion=None
-    cardcount=0
+    cardcount=-1
     nodedead=False
     if nodedead==False and cpunodesonly==False:
         cardcount=0
@@ -175,8 +175,7 @@ def CheckWhichGPUCardsActive(node):
     p = subprocess.Popen(job, stdout=subprocess.PIPE,shell=True)
     nodedead,output=CheckForDeadNode(p,node)
     lines=output.split('\n')
-    cards=0
-    count=0
+    count=-1
     for line in lines:
         linesplit=line.split()
         if len(linesplit)==15:
