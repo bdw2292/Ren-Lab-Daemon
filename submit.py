@@ -365,8 +365,8 @@ def WriteToLogFile(string,loghandle=None):
 
 def CallSubprocess(node,jobpath,bashrcpath,job,loghandle,wait=False):
     if node[-1].isdigit() and '-' in node:
-        node=node[:-2]
         cardvalue=node[-1]
+        node=node[:-2]
         job=SpecifyGPUCard(cardvalue,job)
     cmdstr = 'ssh %s "cd %s;source %s;%s"' %(str(node),jobpath,bashrcpath,job)
     process = subprocess.Popen(cmdstr, stdout=loghandle,stderr=loghandle,shell=True)
