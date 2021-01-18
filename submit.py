@@ -35,7 +35,7 @@ loggerfile=curdir+'logger.txt'
 jobtoinfo=curdir+'jobtoinfo.txt'
 writepath=curdir
 
-masterloghandle=open(loggerfile,'a',buffering=1)
+masterloghandle=open(loggerfile,'w',buffering=1)
 sleeptime=60
 cpuprogramexceptionlist=['psi4','g09','g16',"cp2k.ssmp","mpirun_qchem","dynamic.x"] # dont run on cpu node if detect these programs
 gpuprogramexceptionlist=['dynamic_omm.x','dynamic.mixed'] # dont run on gpu nodes if detect these programs
@@ -56,7 +56,7 @@ for o, a in opts:
     elif o in ("--cpunodesonly"):
         cpunodesonly=True
     elif o in ("--gpunodesonly"):
-        cpunodesonly=True
+        gpunodesonly=True
 
 
 def RemoveAlreadyActiveNodes(nodelist,programexceptionlist,gpunodes=False):
@@ -164,7 +164,7 @@ def CheckGPUStats(node):
             linesplit=line.split()
             if 'CUDA' in line:
                 cudaversion=linesplit[8]
-            if '+-------------------------------+----------------------+----------------------+' in line:
+            if len(linesplit)==15:
                 cardcount+=1
     return cudaversion,cardcount
 
