@@ -29,6 +29,11 @@ python path_to_submit.py --bashrcpath=bashrcpath --jobinfofilepath=jobinfofilepa
 --job=cd /home/bdw2292/PoltypeJobs/NewMethanolTest/methanol_test/qm-torsion && psi4 methanol-opt-1_1-2-284.psi4 methanol-opt-1_1-2-284.log --outputlogpath=/home/bdw2292/PoltypeJobs/NewMethanolTest/methanol_test/methanol-poltype.log --scratchdir=/scratch/bdw2292/Psi4-methanol --scratchspace=65GB
 ```
 
+* Example with dynamic_omm.x (needs to be in $PATH defined in bashrc files)
+```
+--job=dynamic_omm.x /home/bdw2292/Sims/Aniline/solvwaterboxmin.xyz -k /home/bdw2292/Sims/Aniline/aniline.key 16666 3 100 2 30 N > /home/bdw2292/Sims/Aniline/Aniline_30_16666.out --outputlogpath=/home/bdw2292/Sims/Aniline/Aniline_30_16666.out
+```
+
 ## Hostname Node Topology
 * Saved in nodes.txt
 * include a \# in the line to ignore hostnames
