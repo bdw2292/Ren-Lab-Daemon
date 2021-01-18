@@ -4,28 +4,30 @@
 * bashrcpath is optional argument, if not given the bashrcpaths are extracted from the text file tinkerbashrcpaths.txt. This textfile contains columns for linux OS, CUDA version and CPU / GPU tinker bashrc envioronments. The example CPU envioronment also includes poltype envioronment settings for running QM jobs.
 * jobinfofilepath is required argument
 * cpunodesonly and gpunodesonly are optional arguments to reduce time pinging nodes for information in cluster 
-``
+
+```
 python path_to_submit.py --jobinfofilepath=jobinfofilepath
 python path_to_submit.py --jobinfofilepath=jobinfofilepath --cpunodesonly
 python path_to_submit.py --jobinfofilepath=jobinfofilepath --gpunodesonly
 python path_to_submit.py --bashrcpath=bashrcpath --jobinfofilepath=jobinfofilepath
 
-``
+```
 
 ## Job Info File Path
 * jobinfofilepath is a text file with possible formats below
 * scrachdir and scratchspace are optional assignments for QM jobs
 * outputlogpath outputs status of job from daemon to outputlog file 
-``
+
+```
 --job=command --outputlogpath=log --scratchdir=scratchdir --scratchspace=disk
 --job=command --outputlogpath=log 
-``
+```
 
 * Example file contents for jobinfofilepath
-``
+```
 --job=cd /home/bdw2292/PoltypeJobs/NewMethanolTest/methanol_test/qm-torsion && psi4 methanol-opt-1_1-2-254.psi4 methanol-opt-1_1-2-254.log --outputlogpath=/home/bdw2292/PoltypeJobs/NewMethanolTest/methanol_test/methanol-poltype.log --scratchdir=/scratch/bdw2292/Psi4-methanol --scratchspace=65GB
 --job=cd /home/bdw2292/PoltypeJobs/NewMethanolTest/methanol_test/qm-torsion && psi4 methanol-opt-1_1-2-284.psi4 methanol-opt-1_1-2-284.log --outputlogpath=/home/bdw2292/PoltypeJobs/NewMethanolTest/methanol_test/methanol-poltype.log --scratchdir=/scratch/bdw2292/Psi4-methanol --scratchspace=65GB
-``
+```
 
 ## Hostname Node Topology
 * Saved in nodes.txt

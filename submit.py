@@ -257,7 +257,6 @@ def DistributeJobsToNodes(nodes,jobs,jobtoscratchspace,prevnodetojoblist):
                    WriteToLogFile('not enough scratch space for job = '+job+' on node '+node)
                else:
                    newnodes.append(node)
-               WriteToLogFile('was it enough '+str(isitenough))
 
         jobspernodelist=JobsPerNodeList(jobs,newnodes)
         for i in range(len(jobspernodelist)):
