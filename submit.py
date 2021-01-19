@@ -498,7 +498,7 @@ def GPUCardToNode(gpucards):
     return gpucardtonode
 
 def SpecifyGPUCard(cardvalue,job):
-    string='export CUDA_VISIBLE_DEVICES='+str(cardvalue)
+    string='CUDA_DEVICE_ORDER=PCI_BUS_ID '+';'+' export CUDA_VISIBLE_DEVICES='+str(cardvalue)
     job=string+';'+job
     return job
 
