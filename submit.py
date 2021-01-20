@@ -156,8 +156,12 @@ def CheckOSVersion(node):
             if found==True:
                 if eidx==specialidx:
                     version=e
-        versionsplit=version.split('.')
-        osversion=versionsplit[0]
+        if found==False:
+            print('line',line)
+            nodedead=True
+        else:
+            versionsplit=version.split('.')
+            osversion=versionsplit[0]
     return osversion,nodedead
 
 
