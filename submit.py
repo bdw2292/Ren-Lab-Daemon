@@ -24,6 +24,7 @@ global bashrcfilename
 global cpunodesonly
 global gpunodesonly
 global nodetimeout
+global verbosemode
 
 curdir = os.path.dirname(os.path.realpath(__file__))+r'/'
 bashrcfilename=curdir+'tinkerbashrcpaths.txt'
@@ -46,8 +47,9 @@ gpuprogramlist=['dynamic_omm.x','bar_omm.x'] # run on gpu node env if see these
 cpunodesonly=False
 gpunodesonly=False
 nodetimeout=5 # nodetime out if checking node features with command stalls
+verbosemode=False
 
-opts, xargs = getopt.getopt(sys.argv[1:],'',["bashrcpath=","jobinfofilepath=","cpunodesonly","gpunodesonly"])
+opts, xargs = getopt.getopt(sys.argv[1:],'',["bashrcpath=","jobinfofilepath=","cpunodesonly","gpunodesonly","verbosemode"])
 for o, a in opts:
     if o in ("--bashrcpath"):
         inputbashrcpath=a
@@ -57,11 +59,18 @@ for o, a in opts:
         cpunodesonly=True
     elif o in ("--gpunodesonly"):
         gpunodesonly=True
+    elif o in ("--verbosemode"):
+        verbosemode=True
 
 
 def RemoveAlreadyActiveNodes(nodelist,programexceptionlist,gpunodes=False):
     newnodelist=[]
-    for nodeidx in tqdm(range(len(nodelist)),desc='Checking already active nodes'):
+    if verbosemode==True:
+        disablebool=False
+    else:
+        disablebool=True
+
+    for nodeidx in tqdm(range(len(nodelist)),desc='Checking already active nodes',disable=disablebool):
         node=nodelist[nodeidx]
         keepnode=False
         nonactivecards=[]
@@ -105,7 +114,11 @@ def PingNodesAndDetermineNodeInfo(nodelist):
     gpunodes=[] # includes the -0, -1 after for cards etc...
     nodetoosversion={}
     gpunodetocudaversion={}
-    for nodeidx in tqdm(range(len(nodelist)),desc='Pinging nodes'):
+    if verbosemode==True:
+        disablebool=False
+    else:
+        disablebool=True
+    for nodeidx in tqdm(range(len(nodelist)),desc='Pinging nodes',disable=disablebool):
         node=nodelist[nodeidx]
         osversion,nodedead=CheckOSVersion(node)
         if nodedead==False:
@@ -459,10 +472,15 @@ def SubmitJobs(cpunodetojoblist,gpunodetojoblist,inputbashrcpath,sleeptime,jobto
 
 def SubmitJobsLoop(nodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjoblist,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths):
     polledjobs=[]
-    for nodeidx in tqdm(range(len(list(nodetojoblist.keys()))),desc='Cycling through available nodes for submission'):
+    if verbosemode==True:
+        disablebool=False
+    else:
+        disablebool=True
+
+    for nodeidx in tqdm(range(len(list(nodetojoblist.keys()))),desc='Cycling through available nodes for submission',disable=disablebool):
         node=list(nodetojoblist.keys())[nodeidx]
         joblist=nodetojoblist[node]
-        for i in tqdm(range(len(joblist)),desc='Submitting jobs on node %s '+node):
+        for i in tqdm(range(len(joblist)),desc='Submitting jobs on node %s '+node,disable=disablebool):
             job=joblist[i]
             loghandle=jobtologhandle[job]
             logname=jobinfo['logname'][job]
