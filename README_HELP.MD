@@ -4,9 +4,10 @@
 * bashrcpath is optional argument, if not given the bashrcpaths are extracted from the text file tinkerbashrcpaths.txt. This textfile contains columns for linux OS, CUDA version and CPU / GPU tinker bashrc envioronments. The example CPU envioronment also includes poltype envioronment settings for running QM jobs.
 * jobinfofilepath is required argument
 * cpunodesonly and gpunodesonly are optional arguments to reduce time pinging nodes for information in cluster 
-
+* verbosemode is optional argument to see progress bars in output file (in nohup to or standard out)
 ```
 python path_to_submit.py --jobinfofilepath=jobinfofilepath
+python path_to_submit.py --jobinfofilepath=jobinfofilepath --verbosemode
 python path_to_submit.py --jobinfofilepath=jobinfofilepath --cpunodesonly
 python path_to_submit.py --jobinfofilepath=jobinfofilepath --gpunodesonly
 python path_to_submit.py --bashrcpath=bashrcpath --jobinfofilepath=jobinfofilepath
