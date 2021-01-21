@@ -17,10 +17,12 @@ python path_to_submit.py --bashrcpath=bashrcpath --jobinfofilepath=jobinfofilepa
 * jobinfofilepath is a text file with possible formats below
 * scrachdir and scratchspace are optional assignments for QM jobs
 * outputlogpath outputs status of job from daemon to outputlog file 
+* if jobpath is not specified, default path is outputlogpath directory
 
 ```
---job=command --outputlogpath=log --scratchdir=scratchdir --scratchspace=disk
---job=command --outputlogpath=log 
+--job=command --outputlogpath=log --scratchdir=scratchdir --scratchspace=disk --jobpath=path_to_job
+--job=command --outputlogpath=log --jobpath=path_to_job
+--job=command --outputlogpath=log
 ```
 
 * Example file contents for jobinfofilepath
@@ -33,6 +35,13 @@ python path_to_submit.py --bashrcpath=bashrcpath --jobinfofilepath=jobinfofilepa
 ```
 --job=dynamic_omm.x /home/bdw2292/Sims/Aniline/solvwaterboxmin.xyz -k /home/bdw2292/Sims/Aniline/aniline.key 16666 3 100 2 30 N > /home/bdw2292/Sims/Aniline/Aniline_30_16666.out --outputlogpath=/home/bdw2292/Sims/Aniline/Aniline_30_16666.out
 ```
+* Example with jobpath= (changes directory to jobpath)
+```
+--job=dynamic_omm.x solvwaterboxproddyn.xyz -k aniline_lambda.key 166666 3 2 2 298 N > /home/bdw2292/Sims/Aniline/SolvSim/SolvSimEle1_Vdw1/SolvSimEle1_Vdw1.out --outputlogpath=/home/bdw2292/Sims/Aniline/proddynamicsjobs.txt --jobpath=/home/bdw2292/Sims/Aniline/SolvSim/SolvSimEle1_Vdw1
+--job=dynamic_omm.x solvwaterboxproddyn.xyz -k aniline_lambda.key 166666 3 2 2 298 N > /home/bdw2292/Sims/Aniline/SolvSim/SolvSimEle.5_Vdw1/SolvSimEle.5_Vdw1.out --outputlogpath=/home/bdw2292/Sims/Aniline/proddynamicsjobs.txt --jobpath=/home/bdw2292/Sims/Aniline/SolvSim/SolvSimEle.5_Vdw1
+```
+
+
 
 ## Hostname Node Topology
 * Saved in nodes.txt

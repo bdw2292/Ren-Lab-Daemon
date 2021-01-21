@@ -488,7 +488,12 @@ def SubmitJobsLoop(nodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjob
             job=joblist[i]
             loghandle=jobtologhandle[job]
             logname=jobinfo['logname'][job]
-            jobpath,tail=os.path.split(logname)
+            logpath,tail=os.path.split(logname)
+            jobpath=jobinfo['jobpath'][job]
+            if jobpath==None:
+                path=logpath
+            else:
+                path=jobpath
             submit=True
             if job not in jobtoprocess.keys():
 
@@ -507,7 +512,7 @@ def SubmitJobsLoop(nodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjob
                         bashrcpath=DetermineBashrcPath(nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,node)
                     else:
                         bashrcpath=inputbashrcpath
-                    jobtoprocess=SubmitJob(node,jobpath,bashrcpath,job,loghandle,jobtoprocess,jobinfo['scratch'],jobinfo)
+                    jobtoprocess=SubmitJob(node,path,bashrcpath,job,loghandle,jobtoprocess,jobinfo['scratch'],jobinfo)
             elif job in jobtoprocess.keys() and job not in polledjobs:
                 finishedjoblist,term,polledjobs=PollProcess(jobtoprocess,job,finishedjoblist,loghandle,node,polledjobs)
     return jobinfo,jobtoprocess,finishedjoblist
@@ -548,17 +553,25 @@ def WriteOutJobInfo(jobinfo,filepath,jobtoprocess):
     jobtologname=jobinfo['logname']
     jobtoscratch=jobinfo['scratch']
     jobtoscratchspace=jobinfo['scratchspace']
+    jobtojobpath=jobinfo['jobpath']
     counter=0
+    array=['--scratchdir=','--scratchspace=','--jobpath=']
     for job,log in jobtologname.items():
         if job in jobtoprocess.keys():
             continue
         counter+=1
         scratch=jobtoscratch[job]
         scratchspace=jobtoscratchspace[job]
-        if scratch!=None and scratchspace!=None:
-            temp.write('--job='+job+' '+'--outputlogpath='+log+' '+'--scratchdir='+scratch+' '+'--scratchspace='+scratchspace+'\n')
-        else:
-            temp.write('--job='+job+' '+'--outputlogpath='+log+'\n')
+        jobpath=jobtojobpath[job]
+        curarray=[scratch,scratchspace,jobpath]
+        string='--job='+job+' '+'--outputlogpath='+log+' '
+        for i in range(len(array)):
+            input=array[i]
+            value=curarray[i]
+            if value!=None:
+                string+=input+value+' '
+        string+='\n'
+        temp.write(string)
         temp.flush()
         os.fsync(temp.fileno())
 
@@ -581,6 +594,7 @@ def ParseJobInfo(line):
     logname=None
     scratch=None
     scratchspace=None
+    jobpath=None
     for line in linesplit:
         if "job=" in line:
             job=line.replace('job=','')
@@ -590,7 +604,10 @@ def ParseJobInfo(line):
             scratch=line.replace('scratchdir=','')
         if "scratchspace=" in line:
             scratchspace=line.replace('scratchspace=','')
-    return job,logname,scratch,scratchspace
+        if "jobpath=" in line:
+            jobpath=line.replace('jobpath=','')
+
+    return job,logname,scratch,scratchspace,jobpath
 
 
 def ReadTempJobInfoFiles(jobinfo):
@@ -629,12 +646,14 @@ def ReadJobInfoFromFile(jobinfo,filename):
         results=temp.readlines()
         temp.close()
         for line in results:
-            job,log,scratch,scratchspace=ParseJobInfo(line)
+            job,log,scratch,scratchspace,jobpath=ParseJobInfo(line)
             if job==None or log==None:
                 continue
             jobinfo['logname'][job]=log
             jobinfo['scratch'][job]=scratch
             jobinfo['scratchspace'][job]=scratchspace
+            jobinfo['jobpath'][job]=jobpath
+
     return jobinfo
 
 
@@ -720,6 +739,7 @@ jobinfo={}
 jobinfo['logname']={}
 jobinfo['scratch']={}
 jobinfo['scratchspace']={}
+jobinfo['jobpath']={}
 jobinfo=ReadJobInfoFromFile(jobinfo,jobinfofilepath)# input job info
 jobtoprocess={}
 if os.path.isfile(pidfile): # dont rerun daemon if instance is already running!
@@ -742,7 +762,11 @@ else:
         cpunodetojoblist=DistributeJobsToNodes(cpunodes,cpujobs,jobinfo['scratchspace'],cpunodetojoblist)
         gpunodetojoblist=DistributeJobsToNodes(gpucards,gpujobs,jobinfo['scratchspace'],gpunodetojoblist)
         SubmitJobs(cpunodetojoblist,gpunodetojoblist,inputbashrcpath,sleeptime,jobtologhandle,jobinfo,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths)
+    except: # then daemon crashed
+        if os.path.isfile(pidfile): # delete pid file
+            os.remove(pidfile)
+    
     finally:
         if os.path.isfile(pidfile): # delete pid file
-            os.unlink(pidfile)
+            os.remove(pidfile)
     
