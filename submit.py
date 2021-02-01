@@ -1,5 +1,6 @@
 import os
 import sys
+import traceback
 import subprocess
 import time
 import getopt
@@ -157,7 +158,6 @@ def CheckOSVersion(node):
                 if eidx==specialidx:
                     version=e
         if found==False:
-            print('line',line)
             nodedead=True
         else:
             versionsplit=version.split('.')
@@ -251,29 +251,86 @@ def JobsPerNodeList(jobs,nodes):
     return jobspernodelist
 
 
-def DistributeJobsToNodes(nodes,jobs,jobtoscratchspace,prevnodetojoblist):
+def CheckScratchSpaceAllJobs(jobspernodelist,nodes,jobtoscratchspace):
+    newnodes=[]
+    for i in range(len(jobspernodelist)):
+       joblist=jobspernodelist[i]
+       node=nodes[i]
+       isitenough=False
+       for job in joblist:
+           scratchspaceneeded=jobtoscratchspace[job]
+           if scratchspaceneeded!=None:
+               scratchavail=CheckScratchSpace(node)
+               if scratchavail!=False:
+                   isitenough=CheckIfEnoughScratch(scratchspaceneeded,scratchavail)
+           else:
+               isitenough=True
+           if isitenough==False:
+               WriteToLogFile('not enough scratch space for job = '+job+' on node '+node)
+           else:
+               newnodes.append(node)
+    return newnodes
+
+
+def CheckBashrcPathsAllJobs(nodes,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths):
+    newnodes=[]
+    for node in nodes:
+        bashrcpath,accept=DetermineBashrcPath(nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,node)
+        if accept==True:
+            newnodes.append(node)
+    return newnodes
+
+def CheckRAM(node):
+    ram=False
+    cmdstr='free -g'
+    output=CheckOutputFromExternalNode(node,cmdstr)
+    if output!=False:
+        lines=output.split('\n')
+        for line in lines:
+            linesplit=line.split()
+            if 'Mem' in line:
+                ram=float(linesplit[3])
+            elif 'buffers/cache' in line:
+                ram=float(linesplit[3]) 
+
+    return ram
+
+def CheckRAMAllJobs(jobspernodelist,nodes,jobtoram):
+    newnodes=[]
+    for i in range(len(jobspernodelist)):
+       joblist=jobspernodelist[i]
+       node=nodes[i]
+       isitenough=False
+       for job in joblist:
+           ramneeded=jobtoram[job]
+           if ramneeded!=None:
+               ramavail=CheckRAM(node)
+               if ramavail!=False:
+                   isitenough=CheckIfEnoughRAM(ramneeded,ramavail)
+           else:
+               isitenough=True
+           if isitenough==False:
+               WriteToLogFile('not enough ram for job = '+job+' on node '+node)
+           else:
+               newnodes.append(node)
+    return newnodes
+
+def CheckIfEnoughRAM(ramneeded,ramavail):
+    enough=True
+    if float(ramneeded)<ramavail:
+        enough=False
+    return enough
+
+
+
+def DistributeJobsToNodes(nodes,jobs,jobtoscratchspace,prevnodetojoblist,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,jobtoram):
     nodetojoblist={}
     nodetojoblist.update(prevnodetojoblist)
     if len(nodes)!=0:
         jobspernodelist=JobsPerNodeList(jobs,nodes)
-        newnodes=[]
-        for i in range(len(jobspernodelist)):
-           joblist=jobspernodelist[i]
-           node=nodes[i]
-           isitenough=False
-           for job in joblist:
-               scratchspaceneeded=jobtoscratchspace[job]
-               if scratchspaceneeded!=None:
-                   scratchavail=CheckScratchSpace(node)
-                   if scratchavail!=False:
-                       isitenough=CheckIfEnoughScratch(scratchspaceneeded,scratchavail)
-               else:
-                   isitenough=True
-               if isitenough==False:
-                   WriteToLogFile('not enough scratch space for job = '+job+' on node '+node)
-               else:
-                   newnodes.append(node)
-
+        newnodes=CheckScratchSpaceAllJobs(jobspernodelist,nodes,jobtoscratchspace)
+        newnodes=CheckBashrcPathsAllJobs(nodes,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths)
+        newnodes=CheckRAMAllJobs(jobspernodelist,nodes,jobtoram)
         jobspernodelist=JobsPerNodeList(jobs,newnodes)
         for i in range(len(jobspernodelist)):
            joblist=jobspernodelist[i]
@@ -469,8 +526,8 @@ def SubmitJobs(cpunodetojoblist,gpunodetojoblist,inputbashrcpath,sleeptime,jobto
         jobinfo=ReadJobInfoFromFile(jobinfo,jobtoinfo)
         cpujobs,gpujobs=PartitionJobs(jobinfo,cpuprogramlist,gpuprogramlist)
         jobtologhandle=CreateNewLogHandles(jobinfo['logname'],jobtologhandle)
-        cpunodetojoblist=DistributeJobsToNodes(cpunodes,cpujobs,jobinfo['scratchspace'],cpunodetojoblist)
-        gpunodetojoblist=DistributeJobsToNodes(gpucards,gpujobs,jobinfo['scratchspace'],gpunodetojoblist)
+        cpunodetojoblist=DistributeJobsToNodes(cpunodes,cpujobs,jobinfo['scratchspace'],cpunodetojoblist,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,jobinfo['ram'])
+        gpunodetojoblist=DistributeJobsToNodes(gpucards,gpujobs,jobinfo['scratchspace'],gpunodetojoblist,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,jobinfo['ram'])
         jobnumber=len(jobtologhandle.keys())
     WriteToLogFile('All jobs have finished ')
 
@@ -509,7 +566,7 @@ def SubmitJobsLoop(nodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjob
                             submit=False
                 if submit==True: # here need to read bashrcpaths if variable not specified
                     if inputbashrcpath==None:
-                        bashrcpath=DetermineBashrcPath(nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,node)
+                        bashrcpath,accept=DetermineBashrcPath(nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,node)
                     else:
                         bashrcpath=inputbashrcpath
                     jobtoprocess=SubmitJob(node,path,bashrcpath,job,loghandle,jobtoprocess,jobinfo['scratch'],jobinfo)
@@ -554,8 +611,9 @@ def WriteOutJobInfo(jobinfo,filepath,jobtoprocess):
     jobtoscratch=jobinfo['scratch']
     jobtoscratchspace=jobinfo['scratchspace']
     jobtojobpath=jobinfo['jobpath']
+    jobtoram=jobinfo['ram']
     counter=0
-    array=['--scratchdir=','--scratchspace=','--jobpath=']
+    array=['--scratchdir=','--scratchspace=','--jobpath=','--ram=']
     for job,log in jobtologname.items():
         if job in jobtoprocess.keys():
             continue
@@ -563,7 +621,8 @@ def WriteOutJobInfo(jobinfo,filepath,jobtoprocess):
         scratch=jobtoscratch[job]
         scratchspace=jobtoscratchspace[job]
         jobpath=jobtojobpath[job]
-        curarray=[scratch,scratchspace,jobpath]
+        ram=jobtoram[job]
+        curarray=[scratch,scratchspace,jobpath,ram]
         string='--job='+job+' '+'--outputlogpath='+log+' '
         for i in range(len(array)):
             input=array[i]
@@ -595,6 +654,7 @@ def ParseJobInfo(line):
     scratch=None
     scratchspace=None
     jobpath=None
+    ram=None
     for line in linesplit:
         if "job=" in line:
             job=line.replace('job=','')
@@ -606,8 +666,11 @@ def ParseJobInfo(line):
             scratchspace=line.replace('scratchspace=','')
         if "jobpath=" in line:
             jobpath=line.replace('jobpath=','')
+        if "ram=" in line:
+            jobpath=line.replace('ram=','')
 
-    return job,logname,scratch,scratchspace,jobpath
+
+    return job,logname,scratch,scratchspace,jobpath,ram
 
 
 def ReadTempJobInfoFiles(jobinfo):
@@ -646,13 +709,14 @@ def ReadJobInfoFromFile(jobinfo,filename):
         results=temp.readlines()
         temp.close()
         for line in results:
-            job,log,scratch,scratchspace,jobpath=ParseJobInfo(line)
+            job,log,scratch,scratchspace,jobpath,ram=ParseJobInfo(line)
             if job==None or log==None:
                 continue
             jobinfo['logname'][job]=log
             jobinfo['scratch'][job]=scratch
             jobinfo['scratchspace'][job]=scratchspace
             jobinfo['jobpath'][job]=jobpath
+            jobinfo['ram'][job]=ram
 
     return jobinfo
 
@@ -721,25 +785,34 @@ def ReadInBashrcs(bashrcfilename):
 
 def DetermineBashrcPath(nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,node):
     usinggpunode=False
+    bashrcpath=None
+    accept=True
     if node[-1].isdigit() and '-' in node:
         gpunode=node
         node=node[:-2]
         usinggpunode=True
     osversion=nodetoosversion[node]
+    dic=ostocudaversiontobashrcpaths[osversion]
     if usinggpunode==True:
         cudaversion=gpunodetocudaversion[gpunode]
-        bashrcpath=ostocudaversiontobashrcpaths[osversion][cudaversion]['gputinkerbashrc']
+        if cudaversion in dic.keys():
+            bashrcpath=dic[cudaversion]['gputinkerbashrc']
+        else:
+            accept=False
+            WriteToLogFile('node '+node+' with cudaversion '+str(cudaversion)+' has no bashrcpath') 
     else:
-        bashrcpath=ostocudaversiontobashrcpaths[osversion]['cputinkerbashrc']
+        bashrcpath=dic['cputinkerbashrc']
 
 
-    return bashrcpath
+    return bashrcpath,accept
+
 
 jobinfo={}
 jobinfo['logname']={}
 jobinfo['scratch']={}
 jobinfo['scratchspace']={}
 jobinfo['jobpath']={}
+jobinfo['ram']={}
 jobinfo=ReadJobInfoFromFile(jobinfo,jobinfofilepath)# input job info
 jobtoprocess={}
 if os.path.isfile(pidfile): # dont rerun daemon if instance is already running!
@@ -759,13 +832,10 @@ else:
         cpujobs,gpujobs=PartitionJobs(jobinfo,cpuprogramlist,gpuprogramlist)
         jobtologhandle=CreateNewLogHandles(jobinfo['logname'],jobtologhandle)
         cpunodes,gpucards,nodetoosversion,gpunodetocudaversion=GrabCPUGPUNodes()
-        cpunodetojoblist=DistributeJobsToNodes(cpunodes,cpujobs,jobinfo['scratchspace'],cpunodetojoblist)
-        gpunodetojoblist=DistributeJobsToNodes(gpucards,gpujobs,jobinfo['scratchspace'],gpunodetojoblist)
+        cpunodetojoblist=DistributeJobsToNodes(cpunodes,cpujobs,jobinfo['scratchspace'],cpunodetojoblist,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,jobinfo['ram'])
+        gpunodetojoblist=DistributeJobsToNodes(gpucards,gpujobs,jobinfo['scratchspace'],gpunodetojoblist,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,jobinfo['ram'])
         SubmitJobs(cpunodetojoblist,gpunodetojoblist,inputbashrcpath,sleeptime,jobtologhandle,jobinfo,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths)
-    except: # then daemon crashed
-        if os.path.isfile(pidfile): # delete pid file
-            os.remove(pidfile)
-    
+        
     finally:
         if os.path.isfile(pidfile): # delete pid file
             os.remove(pidfile)

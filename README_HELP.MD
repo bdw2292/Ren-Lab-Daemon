@@ -19,8 +19,10 @@ python path_to_submit.py --bashrcpath=bashrcpath --jobinfofilepath=jobinfofilepa
 * scrachdir and scratchspace are optional assignments for QM jobs
 * outputlogpath outputs status of job from daemon to outputlog file 
 * if jobpath is not specified, default path is outputlogpath directory
+* ram is optional input to specify how much ram is needed (in GB)
 
 ```
+--job=command --outputlogpath=log --scratchdir=scratchdir --scratchspace=disk --ram=ram --jobpath=path_to_job
 --job=command --outputlogpath=log --scratchdir=scratchdir --scratchspace=disk --jobpath=path_to_job
 --job=command --outputlogpath=log --jobpath=path_to_job
 --job=command --outputlogpath=log
