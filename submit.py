@@ -199,13 +199,18 @@ def CheckWhichGPUCardsActive(node):
         if len(linesplit)==15:
             percent=linesplit[12]
             value=percent.replace('%','')
-            value=float(value)
-            count+=1
-            if value<10:
-                nonactivecards.append(count)
+            if value.isnumeric():
+                value=float(value)
+                count+=1
+                if value<10:
+                    nonactivecards.append(count)
+                else:
+                    card=node+'-'+str(count)
+                    WriteToLogFile('GPU card '+card+' is currently active and cannot use')
             else:
                 card=node+'-'+str(count)
-                WriteToLogFile('GPU card '+card+' is currently active and cannot use')
+                WriteToLogFile('GPU card '+card+' has problem in nvidia-smi and cannot use')
+
 
     return nonactivecards
 
@@ -224,6 +229,8 @@ def CheckOutputFromExternalNode(node,cmdstr):
 
 def ReadNodeList(nodelistfilepath):
     nodelist=[]
+    gpunodesonlylist=[]
+    cpunodesonlylist=[]
     if os.path.isfile(nodelistfilepath):
         temp=open(nodelistfilepath,'r')
         results=temp.readlines()
@@ -232,12 +239,18 @@ def ReadNodeList(nodelistfilepath):
             newline=line.replace('\n','')
             if '#' not in line:
                 linesplit=newline.split()
-                nodelist.append(linesplit[0])
+                node=linesplit[0]
+                nodelist.append(node)
+                if 'CPUONLY' in line:
+                    cpunodesonlylist.append(node)
+                elif 'GPUONLY' in line:
+                    gpunodesonlylist.append(node)
+
             else:
                 WriteToLogFile('Removing from node list '+newline)    
 
         temp.close()
-    return nodelist
+    return nodelist,cpunodesonlylist,gpunodesonlylist
 
 def chunks(lst, n):
     ls=[]
@@ -247,14 +260,17 @@ def chunks(lst, n):
     return ls
 
 def JobsPerNodeList(jobs,nodes):
-    if len(jobs)>len(nodes):
-        remainder=len(jobs) % len(nodes)
-        wholejobs=len(jobs)-remainder
-        jobspernode=int(wholejobs/len(nodes))
+    if len(nodes)==0:
+        jobspernodelist=[]
     else:
-        jobspernode=1
-        wholejobs=len(jobs)
-    jobspernodelist=chunks(jobs[:wholejobs],jobspernode)
+        if len(jobs)>len(nodes):
+            remainder=len(jobs) % len(nodes)
+            wholejobs=len(jobs)-remainder
+            jobspernode=int(wholejobs/len(nodes))
+        else:
+            jobspernode=1
+            wholejobs=len(jobs)
+        jobspernodelist=chunks(jobs[:wholejobs],jobspernode)
     return jobspernodelist
 
 
@@ -588,11 +604,15 @@ def SubmitJobsLoop(nodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjob
                 finishedjoblist,term,polledjobs=PollProcess(jobtoprocess,job,finishedjoblist,loghandle,node,polledjobs)
     return jobinfo,jobtoprocess,finishedjoblist
 
-def GPUCardToNode(gpucards):
+def GPUCardToNode(gpucards,cpunodesonlylist):
     gpucardtonode={}
     for gpucard in gpucards:
         gpunode=gpucard[:-2]
-        gpucardtonode[gpucard]=gpunode
+        if gpunode not in cpunodesonlylist:
+            gpucardtonode[gpucard]=gpunode
+        else:
+            WriteToLogFile('removing node '+gpunode+' from gpunode list since its marked as CPUONLY')
+
     return gpucardtonode
 
 def SpecifyGPUCard(cardvalue,job):
@@ -762,15 +782,22 @@ def PartitionJobs(jobinfo,cpuprogramlist,gpuprogramlist):
 def GrabCPUGPUNodes():
     WriteToLogFile('*************************************')
     WriteToLogFile("Checking available CPU nodes and GPU cards")
-    nodes=ReadNodeList(nodelistfilepath)
+    nodes,cpunodesonlylist,gpunodesonlylist=ReadNodeList(nodelistfilepath)
     cpunodes,gpucards,nodetoosversion,gpunodetocudaversion=PingNodesAndDetermineNodeInfo(nodes)
     WriteToLogFile('*************************************')
     WriteToLogFile("Removing active CPU nodes")
+    newcpunodes=[]
+    for cpunode in cpunodes:
+        if cpunode not in gpunodesonlylist:
+            newcpunodes.append(cpunode)
+        else:
+            WriteToLogFile('removing node '+cpunode+' from cpunode list since its marked as GPUONLY')
     if gpunodesonly==False:
-        cpunodes=RemoveAlreadyActiveNodes(cpunodes,cpuprogramexceptionlist)
+        cpunodes=RemoveAlreadyActiveNodes(newcpunodes,cpuprogramexceptionlist)
     else:
         cpunodes=[]
-    gpucardtonode=GPUCardToNode(gpucards)
+    
+    gpucardtonode=GPUCardToNode(gpucards,cpunodesonlylist)
     gpunodes=list(set(gpucardtonode.values()))
     WriteToLogFile('*************************************')
     WriteToLogFile("Removing active GPU cards")

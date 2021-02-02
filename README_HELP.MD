@@ -49,6 +49,8 @@ python path_to_submit.py --bashrcpath=bashrcpath --jobinfofilepath=jobinfofilepa
 ## Hostname Node Topology
 * Saved in nodes.txt
 * include a \# in the line to ignore hostnames
+* if CPUONLY in line (after hostname) then used only for cpujobs
+* if GPUONLY in line (after hostname) then used only for gpujobs
 
 
 ## How it works
@@ -70,9 +72,6 @@ python path_to_submit.py --bashrcpath=bashrcpath --jobinfofilepath=jobinfofilepa
  
 ## CPU Program Exception List
 * psi4, g09, g16, cp2k.ssmp, mpirun_qchem, dynamic.x
-
-## GPU Program Exception List
-* dynamic_omm.x, dynamic.mixed
 
 ## Restricted Total Program Number
 * bar.x:10, bar_omm.x:10
