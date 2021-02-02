@@ -14,11 +14,11 @@ global restrictedprogramtonumber
 global currentrestrictedprogramtoprocesslist
 global pidfile
 global loggerfile
+global errorloggerfile
 global jobtoinfo
 global masterloghandle
 global writepath
 global cpuprogramexceptionlist
-global gpuprogramexceptionlist
 global cpuprogramlist
 global gpuprogramlist
 global bashrcfilename
@@ -26,6 +26,7 @@ global cpunodesonly
 global gpunodesonly
 global nodetimeout
 global verbosemode
+global mastererrorloghandle
 
 curdir = os.path.dirname(os.path.realpath(__file__))+r'/'
 bashrcfilename=curdir+'tinkerbashrcpaths.txt'
@@ -34,13 +35,14 @@ inputbashrcpath=None
 jobinfofilepath=None
 pidfile=curdir+'daemon.pid' # just in case want to kill daemon
 loggerfile=curdir+'logger.txt'
+errorloggerfile=curdir+'errorlogger.txt'
 jobtoinfo=curdir+'jobtoinfo.txt'
 writepath=curdir
 
 masterloghandle=open(loggerfile,'w',buffering=1)
+mastererrorloghandle=open(errorloggerfile,'a',buffering=1)
 sleeptime=60
 cpuprogramexceptionlist=['psi4','g09','g16',"cp2k.ssmp","mpirun_qchem","dynamic.x"] # dont run on cpu node if detect these programs
-gpuprogramexceptionlist=['dynamic_omm.x','dynamic.mixed'] # dont run on gpu nodes if detect these programs
 restrictedprogramtonumber={'bar.x':10,'bar_omm.x':10} # restrictions on program use for network slow downs
 currentrestrictedprogramtoprocesslist={'bar.x':[],'bar_omm.x':[]}
 cpuprogramlist=['psi4','g09','g16',"cp2k.ssmp","mpirun_qchem","dynamic.x",'minimize.x','minimize','poltype.py'] # run on cpu node env if see these
@@ -64,7 +66,7 @@ for o, a in opts:
         verbosemode=True
 
 
-def RemoveAlreadyActiveNodes(nodelist,programexceptionlist,gpunodes=False):
+def RemoveAlreadyActiveNodes(nodelist,programexceptionlist=None,gpunodes=False):
     newnodelist=[]
     if verbosemode==True:
         disablebool=False
@@ -73,27 +75,29 @@ def RemoveAlreadyActiveNodes(nodelist,programexceptionlist,gpunodes=False):
 
     for nodeidx in tqdm(range(len(nodelist)),desc='Checking already active nodes',disable=disablebool):
         node=nodelist[nodeidx]
-        keepnode=False
+        keepnode=True
         nonactivecards=[]
-        exceptionstring=''
-        for exception in programexceptionlist:
-            exceptionstring+=exception+'|'
-        exceptionstring=exceptionstring[:-1]
-        cmdstr='pgrep '+exceptionstring
-        output=CheckOutputFromExternalNode(node,cmdstr)
-        if output==False:
-            keepnode=True
-            if gpunodes==True:
-                nonactivecards=CheckWhichGPUCardsActive(node)
+        if gpunodes==True:
+            nonactivecards=CheckWhichGPUCardsActive(node)
         else:
-            cmdstr1='ps -p %s'%(output)
-            cmdstr2='ps -p %s'%(output)+' -u'
-            output1=CheckOutputFromExternalNode(node,cmdstr1)
-            output2=CheckOutputFromExternalNode(node,cmdstr2)
-            if type(output1)==str:
-                WriteToLogFile(output1)
-            if type(output2)==str:
-                WriteToLogFile(output2)
+            exceptionstring=''
+            for exception in programexceptionlist:
+                exceptionstring+=exception+'|'
+            exceptionstring=exceptionstring[:-1]
+            cmdstr='pgrep '+exceptionstring
+            output=CheckOutputFromExternalNode(node,cmdstr)
+            if output==False:
+                pass
+            else:
+                keepnode=False
+                cmdstr1='ps -p %s'%(output)
+                cmdstr2='ps -p %s'%(output)+' -u'
+                output1=CheckOutputFromExternalNode(node,cmdstr1)
+                output2=CheckOutputFromExternalNode(node,cmdstr2)
+                if type(output1)==str:
+                    WriteToLogFile(output1)
+                if type(output2)==str:
+                    WriteToLogFile(output2)
 
         if keepnode==True:
             if gpunodes==True:
@@ -103,10 +107,7 @@ def RemoveAlreadyActiveNodes(nodelist,programexceptionlist,gpunodes=False):
             else:
                 newnodelist.append(node)
         else:
-            if gpunodes==False:
-                WriteToLogFile('cannot use cpunode '+node+' because of program exception')
-            else:
-                WriteToLogFile('cannot use gpunode '+node+' because of program exception')
+            WriteToLogFile('cannot use gpunode '+node+' because of program exception')
 
     return newnodelist
 
@@ -202,6 +203,9 @@ def CheckWhichGPUCardsActive(node):
             count+=1
             if value<10:
                 nonactivecards.append(count)
+            else:
+                card=node+'-'+str(count)
+                WriteToLogFile('GPU card '+card+' is currently active and cannot use')
 
     return nonactivecards
 
@@ -224,10 +228,13 @@ def ReadNodeList(nodelistfilepath):
         temp=open(nodelistfilepath,'r')
         results=temp.readlines()
         for line in results:
+
+            newline=line.replace('\n','')
             if '#' not in line:
-                newline=line.replace('\n','')
                 linesplit=newline.split()
                 nodelist.append(linesplit[0])
+            else:
+                WriteToLogFile('Removing from node list '+newline)    
 
         temp.close()
     return nodelist
@@ -339,7 +346,9 @@ def DistributeJobsToNodes(nodes,jobs,jobtoscratchspace,prevnodetojoblist,nodetoo
                if node not in nodetojoblist.keys():
                    nodetojoblist[node]=[]
                nodetojoblist[node].append(job)
-
+    for node,joblist in nodetojoblist.items():
+        for job in joblist:
+            WriteToLogFile('Job '+job+' '+'is assigned to node '+node)
     return nodetojoblist
 
 
@@ -490,6 +499,9 @@ def PollProcess(jobtoprocess,job,finishedjoblist,loghandle,node,polledjobs):
     poll=process.poll()
     polledjobs.append(job)
     if poll!=None:
+        out, err = process.communicate()
+        if process.returncode != 0:
+            WriteToLogFile('Error detected for job '+job,loghandle=mastererrorloghandle)
         if job not in finishedjoblist:
             finishedjoblist.append(job)
             WriteToLogFile(job+' '+'has terminated on node '+node,loghandle)
@@ -759,9 +771,13 @@ def GrabCPUGPUNodes():
     WriteToLogFile('*************************************')
     WriteToLogFile("Removing active GPU cards")
     if cpunodesonly==False:
-        gpucards=RemoveAlreadyActiveNodes(gpunodes,gpuprogramexceptionlist,gpunodes=True)
+        gpucards=RemoveAlreadyActiveNodes(gpunodes,programexceptionlist=None,gpunodes=True)
     else:
         gpucards=[]
+    for gpucard in gpucards:
+        WriteToLogFile('GPU card '+gpucard+' is available for submission')
+    for cpunode in cpunodes:
+        WriteToLogFile('CPU node '+cpunode+' is avaible for submission')
     return cpunodes,gpucards,nodetoosversion,gpunodetocudaversion
 
 def ReadInBashrcs(bashrcfilename):
