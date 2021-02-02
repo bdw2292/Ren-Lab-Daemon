@@ -509,8 +509,8 @@ def SubmitJob(node,jobpath,bashrcpath,job,loghandle,jobtoprocess,jobtoscratchdir
             MakeScratch(node,jobpath,bashrcpath,loghandle,scratchdir)
         process,nodedead=CallSubprocess(node,jobpath,bashrcpath,job,loghandle)
         jobtoprocess[job]=process
-        jobinfo=RemoveJobInfoFromQueue(jobinfo,jobtoprocess)
-    return jobtoprocess,jobinfo
+        RemoveJobInfoFromQueue(jobinfo,jobtoprocess)
+    return jobtoprocess
 
 def PollProcess(jobtoprocess,job,finishedjoblist,loghandle,node,polledjobs):
     process=jobtoprocess[job]
@@ -599,7 +599,7 @@ def SubmitJobsLoop(nodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjob
                         bashrcpath,accept=DetermineBashrcPath(nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,node)
                     else:
                         bashrcpath=inputbashrcpath
-                    jobtoprocess,jobinfo=SubmitJob(node,path,bashrcpath,job,loghandle,jobtoprocess,jobinfo['scratch'],jobinfo)
+                    jobtoprocess=SubmitJob(node,path,bashrcpath,job,loghandle,jobtoprocess,jobinfo['scratch'],jobinfo)
             elif job in jobtoprocess.keys() and job not in polledjobs:
                 finishedjoblist,term,polledjobs=PollProcess(jobtoprocess,job,finishedjoblist,loghandle,node,polledjobs)
     return jobinfo,jobtoprocess,finishedjoblist
@@ -624,7 +624,6 @@ def SpecifyGPUCard(cardvalue,job):
 def RemoveJobInfoFromQueue(jobinfo,jobtoprocess):
     newjobinfo=RemoveAlreadySubmittedJobs(jobtoprocess,jobinfo) # just removing submissions from queue
     WriteOutJobInfo(newjobinfo,jobtoinfo,jobtoprocess)
-    return newjobinfo
 
 def RemoveAlreadySubmittedJobs(jobtoprocess,jobinfo):
     newjobinfo={}
