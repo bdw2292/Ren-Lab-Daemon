@@ -336,8 +336,10 @@ def DistributeJobsToNodes(nodes,jobs,jobtoscratchspace,prevnodetojoblist,nodetoo
     if len(nodes)!=0:
         jobspernodelist=JobsPerNodeList(jobs,nodes)
         newnodes=CheckScratchSpaceAllJobs(jobspernodelist,nodes,jobtoscratchspace)
-        newnodes=CheckBashrcPathsAllJobs(nodes,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths)
-        newnodes=CheckRAMAllJobs(jobspernodelist,nodes,jobtoram)
+        jobspernodelist=JobsPerNodeList(jobs,newnodes)
+        newnodes=CheckBashrcPathsAllJobs(newnodes,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths)
+        jobspernodelist=JobsPerNodeList(jobs,newnodes)
+        newnodes=CheckRAMAllJobs(jobspernodelist,newnodes,jobtoram)
         jobspernodelist=JobsPerNodeList(jobs,newnodes)
         for i in range(len(jobspernodelist)):
            joblist=jobspernodelist[i]
@@ -491,8 +493,8 @@ def SubmitJob(node,jobpath,bashrcpath,job,loghandle,jobtoprocess,jobtoscratchdir
             MakeScratch(node,jobpath,bashrcpath,loghandle,scratchdir)
         process,nodedead=CallSubprocess(node,jobpath,bashrcpath,job,loghandle)
         jobtoprocess[job]=process
-        RemoveJobInfoFromQueue(jobinfo,jobtoprocess)
-    return jobtoprocess
+        jobinfo=RemoveJobInfoFromQueue(jobinfo,jobtoprocess)
+    return jobtoprocess,jobinfo
 
 def PollProcess(jobtoprocess,job,finishedjoblist,loghandle,node,polledjobs):
     process=jobtoprocess[job]
@@ -500,11 +502,11 @@ def PollProcess(jobtoprocess,job,finishedjoblist,loghandle,node,polledjobs):
     polledjobs.append(job)
     if poll!=None:
         out, err = process.communicate()
-        if process.returncode != 0:
-            WriteToLogFile('Error detected for job '+job,loghandle=mastererrorloghandle)
         if job not in finishedjoblist:
             finishedjoblist.append(job)
             WriteToLogFile(job+' '+'has terminated on node '+node,loghandle)
+            if process.returncode != 0:
+                WriteToLogFile('Error detected for job '+job,loghandle=mastererrorloghandle)
         for program in restrictedprogramtonumber.keys():
             if program in job:
                 plist=currentrestrictedprogramtoprocesslist[program]
@@ -581,7 +583,7 @@ def SubmitJobsLoop(nodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjob
                         bashrcpath,accept=DetermineBashrcPath(nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,node)
                     else:
                         bashrcpath=inputbashrcpath
-                    jobtoprocess=SubmitJob(node,path,bashrcpath,job,loghandle,jobtoprocess,jobinfo['scratch'],jobinfo)
+                    jobtoprocess,jobinfo=SubmitJob(node,path,bashrcpath,job,loghandle,jobtoprocess,jobinfo['scratch'],jobinfo)
             elif job in jobtoprocess.keys() and job not in polledjobs:
                 finishedjoblist,term,polledjobs=PollProcess(jobtoprocess,job,finishedjoblist,loghandle,node,polledjobs)
     return jobinfo,jobtoprocess,finishedjoblist
@@ -602,6 +604,7 @@ def SpecifyGPUCard(cardvalue,job):
 def RemoveJobInfoFromQueue(jobinfo,jobtoprocess):
     newjobinfo=RemoveAlreadySubmittedJobs(jobtoprocess,jobinfo) # just removing submissions from queue
     WriteOutJobInfo(newjobinfo,jobtoinfo,jobtoprocess)
+    return newjobinfo
 
 def RemoveAlreadySubmittedJobs(jobtoprocess,jobinfo):
     newjobinfo={}
@@ -612,6 +615,7 @@ def RemoveAlreadySubmittedJobs(jobtoprocess,jobinfo):
         for job in d.keys():
             if job not in jobtoprocess.keys():
                 newjobinfo[key][job]=d[job]
+                
     return newjobinfo
 
 def WriteOutJobInfo(jobinfo,filepath,jobtoprocess):
