@@ -46,7 +46,7 @@ cpuprogramexceptionlist=['psi4','g09','g16',"cp2k.ssmp","mpirun_qchem","dynamic.
 restrictedprogramtonumber={'bar.x':10,'bar_omm.x':10} # restrictions on program use for network slow downs
 currentrestrictedprogramtoprocesslist={'bar.x':[],'bar_omm.x':[]}
 cpuprogramlist=['psi4','g09','g16',"cp2k.ssmp","mpirun_qchem","dynamic.x",'minimize.x','minimize','poltype.py'] # run on cpu node env if see these
-gpuprogramlist=['dynamic_omm.x','bar_omm.x'] # run on gpu node env if see these
+gpuprogramlist=['dynamic_omm.x','bar_omm.x','dynamic.gpu' , 'dynamic.mixed' , 'analyze.gpu' , 'analyze.mixed' , 'bar.gpu', 'bar.mixed'] # run on gpu node env if see these
 cpunodesonly=False
 gpunodesonly=False
 nodetimeout=5 # nodetime out if checking node features with command stalls
@@ -529,6 +529,7 @@ def PollProcess(jobtoprocess,job,finishedjoblist,loghandle,node,polledjobs):
                 if process in plist:
                     currentrestrictedprogramtoprocesslist[program].remove(process)
         term=True
+        
     else:
         for program in restrictedprogramtonumber.keys():
             if program in job:
@@ -554,7 +555,7 @@ def SubmitJobs(cpunodetojoblist,gpunodetojoblist,inputbashrcpath,sleeptime,jobto
         jobinfo=ReadTempJobInfoFiles(jobinfo)
         AddJobInfoToDictionary(jobinfo,jobtoinfo,jobtoprocess)
         jobinfo=ReadJobInfoFromFile(jobinfo,jobtoinfo)
-        cpujobs,gpujobs=PartitionJobs(jobinfo,cpuprogramlist,gpuprogramlist)
+        cpujobs,gpujobs=PartitionJobs(jobinfo,cpuprogramlist,gpuprogramlist,jobtoprocess)
         jobtologhandle=CreateNewLogHandles(jobinfo['logname'],jobtologhandle)
         cpunodetojoblist=DistributeJobsToNodes(cpunodes,cpujobs,jobinfo['scratchspace'],cpunodetojoblist,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,jobinfo['ram'])
         gpunodetojoblist=DistributeJobsToNodes(gpucards,gpujobs,jobinfo['scratchspace'],gpunodetojoblist,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,jobinfo['ram'])
@@ -765,17 +766,18 @@ def WritePIDFile():
     os.fsync(temp.fileno())
     temp.close()
 
-def PartitionJobs(jobinfo,cpuprogramlist,gpuprogramlist):
+def PartitionJobs(jobinfo,cpuprogramlist,gpuprogramlist,jobtoprocess):
     cpujobs=[]
     gpujobs=[]
     d=jobinfo['logname']
     for job in d.keys():
-        for program in cpuprogramlist:
-            if program in job:
-                cpujobs.append(job)
-        for program in gpuprogramlist:
-            if program in job:
-                gpujobs.append(job)
+        if job not in jobtoprocess.keys():
+            for program in cpuprogramlist:
+                if program in job:
+                    cpujobs.append(job)
+            for program in gpuprogramlist:
+                if program in job:
+                    gpujobs.append(job)
     return cpujobs,gpujobs
 
 def GrabCPUGPUNodes():
@@ -875,7 +877,7 @@ else:
         gpunodetojoblist={}
         jobinfo=ReadJobInfoFromFile(jobinfo,jobtoinfo) # internal use text file jobtoinfo (the queue)
         ostocudaversiontobashrcpaths=ReadInBashrcs(bashrcfilename)
-        cpujobs,gpujobs=PartitionJobs(jobinfo,cpuprogramlist,gpuprogramlist)
+        cpujobs,gpujobs=PartitionJobs(jobinfo,cpuprogramlist,gpuprogramlist,jobtoprocess)
         jobtologhandle=CreateNewLogHandles(jobinfo['logname'],jobtologhandle)
         cpunodes,gpucards,nodetoosversion,gpunodetocudaversion=GrabCPUGPUNodes()
         cpunodetojoblist=DistributeJobsToNodes(cpunodes,cpujobs,jobinfo['scratchspace'],cpunodetojoblist,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,jobinfo['ram'])
