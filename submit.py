@@ -95,9 +95,11 @@ def RemoveAlreadyActiveNodes(nodelist,programexceptionlist=None,gpunodes=False):
                 output1=CheckOutputFromExternalNode(node,cmdstr1)
                 output2=CheckOutputFromExternalNode(node,cmdstr2)
                 if type(output1)==str:
-                    WriteToLogFile(output1)
+                    if verbosemode==True:
+                        WriteToLogFile(output1)
                 if type(output2)==str:
-                    WriteToLogFile(output2)
+                    if verbosemode==True:
+                        WriteToLogFile(output2)
 
         if keepnode==True:
             if gpunodes==True:
@@ -107,7 +109,8 @@ def RemoveAlreadyActiveNodes(nodelist,programexceptionlist=None,gpunodes=False):
             else:
                 newnodelist.append(node)
         else:
-            WriteToLogFile('cannot use gpunode '+node+' because of program exception')
+            if verbosemode==True:
+                WriteToLogFile('cannot use gpunode '+node+' because of program exception')
 
     return newnodelist
 
@@ -206,10 +209,12 @@ def CheckWhichGPUCardsActive(node):
                     nonactivecards.append(count)
                 else:
                     card=node+'-'+str(count)
-                    WriteToLogFile('GPU card '+card+' is currently active and cannot use')
+                    if verbosemode==True:
+                        WriteToLogFile('GPU card '+card+' is currently active and cannot use')
             else:
                 card=node+'-'+str(count)
-                WriteToLogFile('GPU card '+card+' has problem in nvidia-smi and cannot use')
+                if verbosemode==True:
+                    WriteToLogFile('GPU card '+card+' has problem in nvidia-smi and cannot use')
 
 
     return nonactivecards
@@ -247,7 +252,8 @@ def ReadNodeList(nodelistfilepath):
                     gpunodesonlylist.append(node)
 
             else:
-                WriteToLogFile('Removing from node list '+newline)    
+                if verbosemode==True:
+                    WriteToLogFile('Removing from node list '+newline)    
 
         temp.close()
     return nodelist,cpunodesonlylist,gpunodesonlylist
@@ -289,7 +295,8 @@ def CheckScratchSpaceAllJobs(jobspernodelist,nodes,jobtoscratchspace):
            else:
                isitenough=True
            if isitenough==False:
-               WriteToLogFile('not enough scratch space for job = '+job+' on node '+node)
+               if verbosemode==True:
+                   WriteToLogFile('not enough scratch space for job = '+job+' on node '+node)
            else:
                newnodes.append(node)
     return newnodes
@@ -333,7 +340,8 @@ def CheckRAMAllJobs(jobspernodelist,nodes,jobtoram):
            else:
                isitenough=True
            if isitenough==False:
-               WriteToLogFile('not enough ram for job = '+job+' on node '+node)
+               if verbosemode==True:
+                   WriteToLogFile('not enough ram for job = '+job+' on node '+node)
            else:
                newnodes.append(node)
     return newnodes
@@ -366,7 +374,8 @@ def DistributeJobsToNodes(nodes,jobs,jobtoscratchspace,prevnodetojoblist,nodetoo
                nodetojoblist[node].append(job)
     for node,joblist in nodetojoblist.items():
         for job in joblist:
-            WriteToLogFile('Job '+job+' '+'is assigned to node '+node)
+            if verbosemode==True:
+                WriteToLogFile('Job '+job+' '+'is assigned to node '+node)
     return nodetojoblist
 
 
@@ -388,11 +397,13 @@ def CheckScratchSpace(node):
             scratchavail=d['/scratch']
         else:
             scratchavail='0G'
-            WriteToLogFile(' node '+node+' has no scratch')
+            if verbosemode==True:
+                WriteToLogFile(' node '+node+' has no scratch')
         if scratchavail==False:
             cmdstr="du -h /scratch | sort -n -r | head -n 15"
             output=CheckOutputFromExternalNode(node,cmdstr)
-            WriteToLogFile(output)
+            if verbosemode==True:
+                WriteToLogFile(output)
 
     return scratchavail
 
@@ -447,10 +458,10 @@ def CheckIfPreviousJobsFinished(jobtoprocess,previousjobs,finishedjoblist,jobtol
             previousjobsfinished=False
         else:
             loghandle=jobtologhandle[job]
-            finishedjoblist,term,polledjobs=PollProcess(jobtoprocess,job,finishedjoblist,loghandle,node,polledjobs)
+            finishedjoblist,term,polledjobs,jobtoprocess=PollProcess(jobtoprocess,job,finishedjoblist,loghandle,node,polledjobs)
             if term==False:
                 previousjobsfinished=False
-    return previousjobsfinished,finishedjoblist
+    return previousjobsfinished,finishedjoblist,jobtoprocess
 
 def WriteToLogFile(string,loghandle=None):
     now = time.strftime("%c",time.localtime())
@@ -523,6 +534,8 @@ def PollProcess(jobtoprocess,job,finishedjoblist,loghandle,node,polledjobs):
             WriteToLogFile(job+' '+'has terminated on node '+node,loghandle)
             if process.returncode != 0:
                 WriteToLogFile('Error detected for job '+job,loghandle=mastererrorloghandle)
+            if job in jobtoprocess.keys():
+                del jobtoprocess[job]
         for program in restrictedprogramtonumber.keys():
             if program in job:
                 plist=currentrestrictedprogramtoprocesslist[program]
@@ -538,7 +551,7 @@ def PollProcess(jobtoprocess,job,finishedjoblist,loghandle,node,polledjobs):
                     currentrestrictedprogramtoprocesslist[program].append(process) 
         WriteToLogFile(job+' '+'has not terminated on node '+node,loghandle)
         term=False
-    return finishedjoblist,term,polledjobs
+    return finishedjoblist,term,polledjobs,jobtoprocess
 
 
 def SubmitJobs(cpunodetojoblist,gpunodetojoblist,inputbashrcpath,sleeptime,jobtologhandle,jobinfo,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths):
@@ -583,10 +596,10 @@ def SubmitJobsLoop(nodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjob
             else:
                 path=jobpath
             submit=True
-            if job not in jobtoprocess.keys():
+            if job not in jobtoprocess.keys() and job not in finishedjoblist:
 
                 previousjobs=joblist[:i]
-                previousjobsfinished,finishedjoblist=CheckIfPreviousJobsFinished(jobtoprocess,previousjobs,finishedjoblist,jobtologhandle,node,polledjobs)
+                previousjobsfinished,finishedjoblist,jobtoprocess=CheckIfPreviousJobsFinished(jobtoprocess,previousjobs,finishedjoblist,jobtologhandle,node,polledjobs)
                 if previousjobsfinished==False:
                     submit=False
                 for program,number in restrictedprogramtonumber.items():
@@ -602,7 +615,7 @@ def SubmitJobsLoop(nodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjob
                         bashrcpath=inputbashrcpath
                     jobtoprocess=SubmitJob(node,path,bashrcpath,job,loghandle,jobtoprocess,jobinfo['scratch'],jobinfo)
             elif job in jobtoprocess.keys() and job not in polledjobs:
-                finishedjoblist,term,polledjobs=PollProcess(jobtoprocess,job,finishedjoblist,loghandle,node,polledjobs)
+                finishedjoblist,term,polledjobs,jobtoprocess=PollProcess(jobtoprocess,job,finishedjoblist,loghandle,node,polledjobs)
     return jobinfo,jobtoprocess,finishedjoblist
 
 def GPUCardToNode(gpucards,cpunodesonlylist):
@@ -612,7 +625,8 @@ def GPUCardToNode(gpucards,cpunodesonlylist):
         if gpunode not in cpunodesonlylist:
             gpucardtonode[gpucard]=gpunode
         else:
-            WriteToLogFile('removing node '+gpunode+' from gpunode list since its marked as CPUONLY')
+            if verbosemode==True:
+                WriteToLogFile('removing node '+gpunode+' from gpunode list since its marked as CPUONLY')
 
     return gpucardtonode
 
@@ -792,7 +806,8 @@ def GrabCPUGPUNodes():
         if cpunode not in gpunodesonlylist:
             newcpunodes.append(cpunode)
         else:
-            WriteToLogFile('removing node '+cpunode+' from cpunode list since its marked as GPUONLY')
+            if verbosemode==True:
+                WriteToLogFile('removing node '+cpunode+' from cpunode list since its marked as GPUONLY')
     if gpunodesonly==False:
         cpunodes=RemoveAlreadyActiveNodes(newcpunodes,cpuprogramexceptionlist)
     else:
@@ -807,9 +822,11 @@ def GrabCPUGPUNodes():
     else:
         gpucards=[]
     for gpucard in gpucards:
-        WriteToLogFile('GPU card '+gpucard+' is available for submission')
+        if verbosemode==True:
+            WriteToLogFile('GPU card '+gpucard+' is available for submission')
     for cpunode in cpunodes:
-        WriteToLogFile('CPU node '+cpunode+' is avaible for submission')
+        if verbosemode==True:
+            WriteToLogFile('CPU node '+cpunode+' is avaible for submission')
     return cpunodes,gpucards,nodetoosversion,gpunodetocudaversion
 
 def ReadInBashrcs(bashrcfilename):
@@ -847,7 +864,8 @@ def DetermineBashrcPath(nodetoosversion,gpunodetocudaversion,ostocudaversiontoba
             bashrcpath=dic[cudaversion]['gputinkerbashrc']
         else:
             accept=False
-            WriteToLogFile('node '+node+' with cudaversion '+str(cudaversion)+' has no bashrcpath') 
+            if verbosemode==True:
+                WriteToLogFile('node '+node+' with cudaversion '+str(cudaversion)+' has no bashrcpath') 
     else:
         bashrcpath=dic['cputinkerbashrc']
 
