@@ -68,7 +68,7 @@ python path_to_submit.py --bashrcpath=bashrcpath --jobinfofilepath=jobinfofilepa
 * psi4 , g09 , g16 , cp2k.ssmp , mpirun_qchem , dynamic.x ,minimize.x , minimize , poltype.py
 
 ## GPU Program List
-* dynamic_omm.x , bar_omm.x 
+* dynamic_omm.x , bar_omm.x , dynamic.gpu , dynamic.mixed , analyze.gpu , analyze.mixed , bar.gpu, bar.mixed
  
 ## CPU Program Exception List
 * psi4, g09, g16, cp2k.ssmp, mpirun_qchem, dynamic.x
