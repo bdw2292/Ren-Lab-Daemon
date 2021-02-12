@@ -86,3 +86,11 @@ python path_to_submit.py --bashrcpath=bashrcpath --jobinfofilepath=jobinfofilepa
 
 ## Logger File
 * Daemon outputs important messages to logger file such as, pinging nodes, removing available nodes due to program exceptions, lack of scratch space, submitting commands to nodes, when jobs finish, removing from queue.., when all jobs finish
+
+## Creating Poltype Job Inputs
+* Need a folder with folders containing .sdf structure files
+* program will create poltype.ini input files in each folder and also the correct input for daemon
+```
+python createpoltypeinputs.py PoltypeStructuresFolder OutputFilePath PoltypePath RamForAllJobs DiskForAllJobs CPUForAllJobs
+python createpoltypeinputs.py /home/bdw2292/TestDaemonSubmissionScript/TestMolecules /home/bdw2292/TestDaemonSubmissionScript /home/bdw2292/currentstable/PoltypeModules/poltype.py 15GB 100GB 4
+```
