@@ -5,8 +5,12 @@
 * jobinfofilepath is required argument
 * cpunodesonly and gpunodesonly are optional arguments to reduce time pinging nodes for information in cluster 
 * verbosemode is optional argument to see progress bars in output file (in nohup to or standard out)
+* listavailnodes will list available nodes in the files 'availablecpunodes.txt' and 'availablegpunodes.txt' then exit
+* redocrashedjobs will check the output errorlog and redo only those jobs also found in jobinfofilepath 
 ```
 python path_to_submit.py --jobinfofilepath=jobinfofilepath
+python path_to_submit.py --jobinfofilepath=jobinfofilepath --redocrashedjobs
+python path_to_submit.py --listavailnodes
 python path_to_submit.py --jobinfofilepath=jobinfofilepath --verbosemode
 python path_to_submit.py --jobinfofilepath=jobinfofilepath --cpunodesonly
 python path_to_submit.py --jobinfofilepath=jobinfofilepath --gpunodesonly
@@ -66,7 +70,7 @@ python path_to_submit.py --bashrcpath=bashrcpath --jobinfofilepath=jobinfofilepa
 * A while loop continuously checks each nodes list of assigned jobs and checks if the subprocess has exited on that node, then resubmits new jobs until the total number of jobs have been finished. 
 * Multiple instances of the dameon are not allowed to run simultaneously. If the program is called while an instance is already running, the input jobs are just added to the existing job queue and then the second instance will exit.
 * Errors are appended to errorlogger.txt 
-
+* Finished jobs (normal termination) are appended to finishedlogger.txt
 ## CPU Program List
 * psi4 , g09 , g16 , cp2k.ssmp , mpirun_qchem , dynamic.x ,minimize.x , minimize , poltype.py
 

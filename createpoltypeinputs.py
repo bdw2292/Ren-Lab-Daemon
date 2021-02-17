@@ -1,8 +1,12 @@
 import os
 import sys
 
-# python createpoltypeinputs.py /home/bdw2292/TestDaemonSubmissionScript/TestMolecules /home/bdw2292/TestDaemonSubmissionScript /home/bdw2292/currentstable/PoltypeModules/poltype.py 15GB 100GB 4
+# python createpoltypeinputs.py /home/bdw2292/TestDaemonSubmissionScript/DrugTestMolecules /home/bdw2292/TestDaemonSubmissionScript /home/bdw2292/currentstable/PoltypeModules/poltype.py 15GB 100GB 4
 # nohup python /home/bdw2292/ExternalAPIRenLab/submit.py --jobinfofilepath=/home/bdw2292/TestDaemonSubmissionScript/jobinfo.txt &
+# nohup python /home/bdw2292/ExternalAPIRenLab/submit.py --jobinfofilepath=/home/bdw2292/TestDaemonSubmissionScript/jobinfo.txt --redocrashedjobs &
+
+
+
 
 structurefolderpath=sys.argv[1] # Folder with folders that have .sdf file in each folder
 outputlogdirectory=sys.argv[2]
@@ -61,6 +65,7 @@ def WritePoltypeInputFile(structure,jobpath,numproc,ram,scratchspace):
     newtemp.write('maxmem='+ram+'\n')
     newtemp.write('maxdisk='+scratchspace+'\n')
     newtemp.write('numproc='+numproc+'\n')
+    newtemp.write('dontdovdwscan=False'+'\n')
     newtemp.close()
     os.chdir(curdir)
 

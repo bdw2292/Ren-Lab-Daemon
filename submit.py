@@ -28,6 +28,14 @@ global nodetimeout
 global verbosemode
 global mastererrorloghandle
 global preserveresourceratio
+global listavailnodes
+global availablecpunodesname
+global availablegpunodesname
+global loggersleeptime
+global currenttime
+global redocrashedjobs
+global masterfinishedloghandle
+
 
 curdir = os.path.dirname(os.path.realpath(__file__))+r'/'
 bashrcfilename=curdir+'tinkerbashrcpaths.txt'
@@ -37,11 +45,15 @@ jobinfofilepath=None
 pidfile=curdir+'daemon.pid' # just in case want to kill daemon
 loggerfile=curdir+'logger.txt'
 errorloggerfile=curdir+'errorlogger.txt'
+finishedloggerfile=curdir+'finishedlogger.txt'
+
 jobtoinfo=curdir+'jobtoinfo.txt'
 writepath=curdir
 
 masterloghandle=open(loggerfile,'w',buffering=1)
 mastererrorloghandle=open(errorloggerfile,'a',buffering=1)
+masterfinishedloghandle=open(finishedloggerfile,'a',buffering=1)
+
 sleeptime=60
 cpuprogramexceptionlist=['psi4','g09','g16',"cp2k.ssmp","mpirun_qchem","dynamic.x"] # dont run on cpu node if detect these programs
 restrictedprogramtonumber={'bar.x 1':10,'bar_omm.x 1':10} # restrictions on program use for network slow downs
@@ -53,10 +65,15 @@ gpunodesonly=False
 nodetimeout=10 # nodetime out if checking node features with command stalls
 verbosemode=False
 preserveresourceratio=.2
+listavailnodes=False
+availablecpunodesname='availablecpunodes.txt'
+availablegpunodesname='availablegpunodes.txt'
+loggersleeptime=60*5
+currenttime=time.time()
+redocrashedjobs=False
 
 
-
-opts, xargs = getopt.getopt(sys.argv[1:],'',["bashrcpath=","jobinfofilepath=","cpunodesonly","gpunodesonly","verbosemode"])
+opts, xargs = getopt.getopt(sys.argv[1:],'',["redocrashedjobs","listavailnodes","bashrcpath=","jobinfofilepath=","cpunodesonly","gpunodesonly","verbosemode"])
 for o, a in opts:
     if o in ("--bashrcpath"):
         inputbashrcpath=a
@@ -68,6 +85,11 @@ for o, a in opts:
         gpunodesonly=True
     elif o in ("--verbosemode"):
         verbosemode=True
+    elif o in ("--listavailnodes"):
+        listavailnodes=True
+    elif o in ("--redocrashedjobs"):
+        redocrashedjobs=True
+
 
 
 def AlreadyActiveNodes(nodelist,programexceptionlist=None,gpunodes=False):
@@ -490,11 +512,26 @@ def FilterDictionariesWithoutSameKeys(nodetoram,nodetoscratchspace,nodetonumproc
 
     return nodetoram,nodetoscratchspace,nodetonumproc
 
+def WriteAvailableNodesOut(nodes,cpujobs,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths):
+    if cpujobs==True:
+        avail=availablecpunodesname
+    else:
+        avail=availablegpunodesname
+    handle=open(avail,'w')
+    for node in nodes:
+        bashrcpath,accept=DetermineBashrcPath(nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,node)
+        handle.write(node+' '+bashrcpath+'\n')
+    handle.close()
 
 def DistributeJobsToNodes(nodes,jobs,jobtoscratchspace,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,jobtoram,jobtonumproc,activenodes,cpujobs=False):
     nodetojoblist={}
     if len(nodes)!=0:
         newnodes=CheckBashrcPathsAllNodes(nodes,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths)
+        if listavailnodes==True:
+            WriteAvailableNodesOut(newnodes,cpujobs,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths)
+            if os.path.isfile(availablecpunodesname) and os.path.isfile(availablegpunodesname):
+                sys.exit()
+
         if cpujobs==True:
             nodetoram=CheckRAMAllNodes(newnodes)
             newnodes=list(nodetoram.keys())
@@ -635,20 +672,26 @@ def SubmitJob(node,jobpath,bashrcpath,job,loghandle,jobtoprocess,jobtoscratchdir
             MakeScratch(node,jobpath,bashrcpath,loghandle,scratchdir)
         process,nodedead=CallSubprocess(node,jobpath,bashrcpath,job,loghandle)
         jobtoprocess[job]=process
-        RemoveJobInfoFromQueue(jobinfo,jobtoprocess)
-    return jobtoprocess
+        jobinfo=RemoveJobInfoFromQueue(jobinfo,jobtoprocess)
+    return jobtoprocess,jobinfo
 
 def PollProcess(jobtoprocess,job,finishedjoblist,loghandle,polledjobs):
     process=jobtoprocess[job]
     poll=process.poll()
     polledjobs.append(job)
     jobstodelete=[]
+    now=time.time()
+    diff=now-currenttime
+    normaltermjobs=[]
     if poll!=None:
         out, err = process.communicate()
         finishedjoblist.append(job)
         WriteToLogFile(job+' '+'has terminated',loghandle)
         if process.returncode != 0:
             WriteToLogFile('Error detected for job '+job,loghandle=mastererrorloghandle)
+        else:
+            WriteToLogFile('Normal termination for job '+job,loghandle=masterfinishedloghandle)
+            normaltermjobs.append(job)
         jobstodelete.append(job)
         for program in restrictedprogramtonumber.keys():
             if program in job:
@@ -662,8 +705,11 @@ def PollProcess(jobtoprocess,job,finishedjoblist,loghandle,polledjobs):
                 plist=currentrestrictedprogramtoprocesslist[program]
                 if process not in plist:
                     currentrestrictedprogramtoprocesslist[program].append(process) 
-        WriteToLogFile(job+' '+'has not terminated ',loghandle)
-    return finishedjoblist,polledjobs,jobstodelete
+        if diff>=loggersleeptime:
+            WriteToLogFile(job+' '+'has not terminated ',loghandle)
+            currenttime=time.time()
+
+    return finishedjoblist,polledjobs,jobstodelete,normaltermjobs
 
 
 def SubmitJobs(cpunodetojoblist,gpunodetojoblist,inputbashrcpath,sleeptime,jobtologhandle,jobinfo,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths):
@@ -671,8 +717,8 @@ def SubmitJobs(cpunodetojoblist,gpunodetojoblist,inputbashrcpath,sleeptime,jobto
     jobtoprocess={}
     finishedjoblist=[]
     while len(finishedjoblist)!=jobnumber:
-        jobtoprocess=SubmitJobsLoop(cpunodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjoblist,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths)
-        jobtoprocess=SubmitJobsLoop(gpunodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjoblist,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths)
+        jobtoprocess,jobinfo=SubmitJobsLoop(cpunodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjoblist,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths)
+        jobtoprocess,jobinfo=SubmitJobsLoop(gpunodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjoblist,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths)
         finishedjoblist,jobtoprocess=CheckJobTermination(jobtoprocess,finishedjoblist,jobtologhandle)
         time.sleep(sleeptime)
         WriteToLogFile('*************************************')
@@ -719,20 +765,24 @@ def SubmitJobsLoop(nodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjob
                         bashrcpath,accept=DetermineBashrcPath(nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,node)
                     else:
                         bashrcpath=inputbashrcpath
-                    jobtoprocess=SubmitJob(node,path,bashrcpath,job,loghandle,jobtoprocess,jobinfo['scratch'],jobinfo)
-    return jobtoprocess
+                    jobtoprocess,jobinfo=SubmitJob(node,path,bashrcpath,job,loghandle,jobtoprocess,jobinfo['scratch'],jobinfo)
+    return jobtoprocess,jobinfo
 
 
 def CheckJobTermination(jobtoprocess,finishedjoblist,jobtologhandle):
     polledjobs=[]
     dellist=[]
+    totalnormaltermjobs=[]
     for job in jobtoprocess.keys():
         if job not in polledjobs and job not in finishedjoblist:
             loghandle=jobtologhandle[job]
-            finishedjoblist,polledjobs,jobtodelete=PollProcess(jobtoprocess,job,finishedjoblist,loghandle,polledjobs)
+            finishedjoblist,polledjobs,jobtodelete,normaltermjobs=PollProcess(jobtoprocess,job,finishedjoblist,loghandle,polledjobs)
             dellist.extend(jobtodelete)
+            totalnormaltermjobs.extend(normaltermjobs)
     for job in dellist:
         del jobtoprocess[job]
+
+    RemoveNormalTermJobsFromErrorLog(totalnormaltermjobs) # if redocrashedjobs and normal term remove from log file
     return finishedjoblist,jobtoprocess
 
 def GPUCardToNode(gpucards,cpunodesonlylist):
@@ -756,6 +806,7 @@ def SpecifyGPUCard(cardvalue,job):
 def RemoveJobInfoFromQueue(jobinfo,jobtoprocess):
     newjobinfo=RemoveAlreadySubmittedJobs(jobtoprocess,jobinfo) # just removing submissions from queue
     WriteOutJobInfo(newjobinfo,jobtoinfo,jobtoprocess)
+    return newjobinfo 
 
 def RemoveAlreadySubmittedJobs(jobtoprocess,jobinfo):
     newjobinfo={}
@@ -874,22 +925,90 @@ def CreateNewLogHandles(jobtologname,jobtologhandle):
         jobtologhandle[job]=loghandle
     return jobtologhandle
 
+
+def ReadCrashedJobs(mastererrorloghandle):
+    crashedjobs=[]
+    if redocrashedjobs==True:
+        mastererrorloghandle.close()
+        temp=open(errorloggerfile,'r')
+        results=temp.readlines()
+        temp.close()
+        delim='Error detected for job'
+        for line in results:
+            linesplit=line.split(delim)
+            job=linesplit[-1].lstrip().rstrip()
+            crashedjobs.append(job)
+         
+        mastererrorloghandle=open(errorloggerfile,'a',buffering=1)
+
+    return crashedjobs  
+
+
+def ReadFinishedJobs(masterfinishedloghandle):
+    finishedjobs=[]
+    masterfinishedloghandle.close()
+    temp=open(finishedloggerfile,'r')
+    results=temp.readlines()
+    temp.close()
+    delim='Normal termination for job'
+    for line in results:
+        linesplit=line.split(delim)
+        job=linesplit[-1].lstrip().rstrip()
+        finishedjobs.append(job)
+     
+    masterfinishedloghandle=open(finishedloggerfile,'a',buffering=1)
+
+    return finishedjobs  
+
+
+
+
+def RemoveNormalTermJobsFromErrorLog(totalnormaltermjobs):
+    mastererrorloghandle.close()
+    temp=open(errorloggerfile,'r')
+    results=temp.readlines()
+    temp.close()
+    newlines=[]
+    for line in results:
+        if job in totalnormaltermjobs:
+            pass
+        else:
+            newlines.append(line)
+    os.remove(errorloggerfile)
+    mastererrorloghandle=open(errorloggerfile,'a',buffering=1)
+    for line in newlines:
+        mastererrorloghandle.write(line)
+
+
 def ReadJobInfoFromFile(jobinfo,filename):
+    if filename==None:
+        return jobinfo
+
+    crashedjobs=ReadCrashedJobs(mastererrorloghandle) 
+    finishedjobs=ReadFinishedJobs(masterfinishedloghandle)
     if os.path.isfile(filename):
         temp=open(filename,'r')
         results=temp.readlines()
         temp.close()
+        addjob=False
         for line in results:
             job,log,scratch,scratchspace,jobpath,ram,numproc=ParseJobInfo(line)
             if job==None or log==None:
                 continue
-           
-            jobinfo['logname'][job]=log
-            jobinfo['scratch'][job]=scratch
-            jobinfo['scratchspace'][job]=scratchspace
-            jobinfo['jobpath'][job]=jobpath
-            jobinfo['ram'][job]=ram
-            jobinfo['numproc'][job]=numproc
+            if len(crashedjobs)>0:
+                if job in crashedjobs:
+                    addjob=True
+            else:
+                addjob=True
+            if job in finishedjobs:
+                addjob=False
+            if addjob==True:
+                jobinfo['logname'][job]=log
+                jobinfo['scratch'][job]=scratch
+                jobinfo['scratchspace'][job]=scratchspace
+                jobinfo['jobpath'][job]=jobpath
+                jobinfo['ram'][job]=ram
+                jobinfo['numproc'][job]=numproc
 
 
     return jobinfo
@@ -1023,7 +1142,7 @@ jobinfo['ram']={}
 jobinfo['numproc']={}
 jobinfo=ReadJobInfoFromFile(jobinfo,jobinfofilepath)# input job info
 jobtoprocess={}
-if os.path.isfile(pidfile): # dont rerun daemon if instance is already running!
+if os.path.isfile(pidfile) and listavailnodes==False: # dont rerun daemon if instance is already running!
     head,tail=os.path.split(jobinfofilepath)
     tempfilepath=writepath+tail.replace('.txt','_TEMP.txt') #if daemon already running but still want to submit, submit to temporary file that will be read in by existing daemon process eventually
     WriteOutJobInfo(jobinfo,tempfilepath,jobtoprocess)
