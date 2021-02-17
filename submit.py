@@ -987,10 +987,12 @@ def RemoveNormalTermJobsFromErrorLog(totalnormaltermjobs,mastererrorloghandle):
 
 def ReadJobInfoFromFile(jobinfo,filename,mastererrorloghandle,masterfinishedloghandle):
     if filename==None:
-        return jobinfo
+        return jobinfo,mastererrorloghandle,masterfinishedloghandle
 
     crashedjobs,mastererrorloghandle=ReadCrashedJobs(mastererrorloghandle) 
     finishedjobs,masterfinishedloghandle=ReadFinishedJobs(masterfinishedloghandle)
+    WriteToLogFile('crashed jobs '+str(crashedjobs))
+    WriteToLogFile('finishedjobs '+str(finishedjobs))
     if os.path.isfile(filename):
         temp=open(filename,'r')
         results=temp.readlines()
