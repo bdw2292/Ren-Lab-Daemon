@@ -675,7 +675,7 @@ def SubmitJob(node,jobpath,bashrcpath,job,loghandle,jobtoprocess,jobtoscratchdir
         jobinfo=RemoveJobInfoFromQueue(jobinfo,jobtoprocess)
     return jobtoprocess,jobinfo
 
-def PollProcess(jobtoprocess,job,finishedjoblist,loghandle,polledjobs,currenttime):
+def PollProcess(jobtoprocess,job,finishedjoblist,loghandle,polledjobs,currenttime,mastererrorloghandle):
     process=jobtoprocess[job]
     poll=process.poll()
     polledjobs.append(job)
@@ -709,10 +709,10 @@ def PollProcess(jobtoprocess,job,finishedjoblist,loghandle,polledjobs,currenttim
             WriteToLogFile(job+' '+'has not terminated ',loghandle)
             currenttime=time.time()
 
-    return finishedjoblist,polledjobs,jobstodelete,normaltermjobs,currenttime
+    return finishedjoblist,polledjobs,jobstodelete,normaltermjobs,currenttime,mastererrorloghandle
 
 
-def SubmitJobs(cpunodetojoblist,gpunodetojoblist,inputbashrcpath,sleeptime,jobtologhandle,jobinfo,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,currenttime,mastererrorloghandle):
+def SubmitJobs(cpunodetojoblist,gpunodetojoblist,inputbashrcpath,sleeptime,jobtologhandle,jobinfo,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,currenttime,mastererrorloghandle,masterfinishedloghandle):
     jobnumber=len(jobtologhandle.keys())
     jobtoprocess={}
     finishedjoblist=[]
@@ -776,7 +776,7 @@ def CheckJobTermination(jobtoprocess,finishedjoblist,jobtologhandle,currenttime,
     for job in jobtoprocess.keys():
         if job not in polledjobs and job not in finishedjoblist:
             loghandle=jobtologhandle[job]
-            finishedjoblist,polledjobs,jobtodelete,normaltermjobs,currenttime=PollProcess(jobtoprocess,job,finishedjoblist,loghandle,polledjobs,currenttime)
+            finishedjoblist,polledjobs,jobtodelete,normaltermjobs,currenttime,mastererrorloghandle=PollProcess(jobtoprocess,job,finishedjoblist,loghandle,polledjobs,currenttime,mastererrorloghandle)
             dellist.extend(jobtodelete)
             totalnormaltermjobs.extend(normaltermjobs)
     for job in dellist:
@@ -971,9 +971,12 @@ def RemoveNormalTermJobsFromErrorLog(totalnormaltermjobs,mastererrorloghandle):
     temp.close()
     newlines=[]
     for line in results:
-        if job in totalnormaltermjobs:
-            pass
-        else:
+        keep=True
+        for job in totalnormaltermjobs:
+            if job in line:
+                keep=False
+        
+        if keep==True:
             newlines.append(line)
     os.remove(errorloggerfile)
     mastererrorloghandle=open(errorloggerfile,'a',buffering=1)
@@ -1163,7 +1166,7 @@ else:
         cpunodes,gpucards,nodetoosversion,gpunodetocudaversion,cpunodesactive,gpucardsactive=GrabCPUGPUNodes()
         cpunodetojoblist=DistributeJobsToNodes(cpunodes,cpujobs,jobinfo['scratchspace'],nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,jobinfo['ram'],jobinfo['numproc'],cpunodesactive,True)
         gpunodetojoblist=DistributeJobsToNodes(gpucards,gpujobs,jobinfo['scratchspace'],nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,jobinfo['ram'],jobinfo['numproc'],gpucardsactive,False)
-        SubmitJobs(cpunodetojoblist,gpunodetojoblist,inputbashrcpath,sleeptime,jobtologhandle,jobinfo,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,currenttime,mastererrorloghandle)
+        SubmitJobs(cpunodetojoblist,gpunodetojoblist,inputbashrcpath,sleeptime,jobtologhandle,jobinfo,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,currenttime,mastererrorloghandle,masterfinishedloghandle)
         
     finally:
         if os.path.isfile(pidfile): # delete pid file
