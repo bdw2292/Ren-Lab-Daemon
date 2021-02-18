@@ -992,22 +992,19 @@ def ReadJobInfoFromFile(jobinfo,filename,mastererrorloghandle,masterfinishedlogh
 
     crashedjobs,mastererrorloghandle=ReadCrashedJobs(mastererrorloghandle) 
     finishedjobs,masterfinishedloghandle=ReadFinishedJobs(masterfinishedloghandle)
-    WriteToLogFile('crashed jobs '+str(crashedjobs))
-    WriteToLogFile('finishedjobs '+str(finishedjobs))
     if os.path.isfile(filename):
         temp=open(filename,'r')
         results=temp.readlines()
         temp.close()
-        addjob=False
+        addjob=True
         for line in results:
             job,log,scratch,scratchspace,jobpath,ram,numproc=ParseJobInfo(line)
             if job==None or log==None:
                 continue
-            if len(crashedjobs)>0:
-                if job in crashedjobs:
-                    addjob=True
-            else:
-                addjob=True
+            if redocrashedjobs==True:
+                if job not in crashedjobs:
+                    addjob=False
+
             if job in finishedjobs:
                 addjob=False
             if addjob==True:
