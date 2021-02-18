@@ -512,7 +512,7 @@ def FilterDictionariesWithoutSameKeys(nodetoram,nodetoscratchspace,nodetonumproc
 
     return nodetoram,nodetoscratchspace,nodetonumproc
 
-def WriteAvailableNodesOut(nodes,cpujobs,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths):
+def WriteAvailableNodesOut(nodes,cpujobs,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,activenodes):
     if cpujobs==True:
         avail=availablecpunodesname
     else:
@@ -520,7 +520,8 @@ def WriteAvailableNodesOut(nodes,cpujobs,nodetoosversion,gpunodetocudaversion,os
     handle=open(avail,'w')
     for node in nodes:
         bashrcpath,accept=DetermineBashrcPath(nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,node)
-        handle.write(node+' '+bashrcpath+'\n')
+        if node not in activenodes:
+            handle.write(node+' '+bashrcpath+'\n')
     handle.close()
 
 def DistributeJobsToNodes(nodes,jobs,jobtoscratchspace,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,jobtoram,jobtonumproc,activenodes,cpujobs=False):
@@ -528,7 +529,7 @@ def DistributeJobsToNodes(nodes,jobs,jobtoscratchspace,nodetoosversion,gpunodeto
     if len(nodes)!=0:
         newnodes=CheckBashrcPathsAllNodes(nodes,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths)
         if listavailnodes==True:
-            WriteAvailableNodesOut(newnodes,cpujobs,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths)
+            WriteAvailableNodesOut(newnodes,cpujobs,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths,activenodes)
             if os.path.isfile(availablecpunodesname) and os.path.isfile(availablegpunodesname):
                 sys.exit()
 
@@ -1065,6 +1066,7 @@ def GrabCPUGPUNodes():
         cpunodesactive=[]
     
     gpucardtonode=GPUCardToNode(gpucards,cpunodesonlylist)
+    gpucards=list(gpucardtonode.keys())
     gpunodes=list(set(gpucardtonode.values()))
     WriteToLogFile('*************************************')
     WriteToLogFile("Checking active GPU cards")
