@@ -1,7 +1,8 @@
 ## Help
 
 ## Usage
-* bashrcpath is optional argument, if not given the bashrcpaths are extracted from the text file tinkerbashrcpaths.txt. This textfile contains columns for linux OS, CUDA version and CPU / GPU tinker bashrc envioronments. The example CPU envioronment also includes poltype envioronment settings for running QM jobs.
+* bashrcpath is optional argument, if not given the bashrcpaths are extracted from the text file tinkerbashrcpaths.txt. This textfile contains columns for linux OS, CUDA version and CPU / GPU tinker bashrc envioronments. The example CPU envioronment also includes poltype envioronment settings for running QM jobs. 
+* Scratch directories for QM/poltype bashrc's need to be modified. It is best to copy bashrcs and make modifications as desired.
 * jobinfofilepath is required argument
 * cpunodesonly and gpunodesonly are optional arguments to reduce time pinging nodes for information in cluster 
 * verbosemode is optional argument to see progress bars in output file (in nohup to or standard out)
