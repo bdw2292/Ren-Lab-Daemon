@@ -63,6 +63,7 @@ python path_to_submit.py --bashrcpath=bashrcpath --jobinfofilepath=jobinfofilepa
 
 ## How it works
 * First all hostnames are pinged to obtain linux OS version and detect GPU cards and the CUDA version. If hostname is unreachable or RSA host keys are missing, the node is just determined as dead and then removed from available node list. If timeout > 5 seconds command does not return anything, then node is assumed unreachable.
+* Make sure to ssh into all hosts manually (so that all hosts are in your rsa keys and reachable by ssh)
 * Next all cpunodes are checked again for any program in cpuprogram exception list. Nodes running these programs are removed from available nodes list (unless ram,scratch or numproc is given in which case possible for multiple CPU jobs per node).
 * Jobs are assigned to either CPU or GPU type according to the lists, cpuprogramlist. GPUs are restricted by activity level, more than 10% usage and card is unusable.
 * Then jobs are assigned evenly to available CPU nodes (only if no extra info like ram,scratch,numproc is given)/ GPU cards. If scratch space is designated, then before assignment, the node is checked for available scratchspace and will not assign to that node if there is not enough scratchspace for a given job. Similar holds true for ram and numproc.
