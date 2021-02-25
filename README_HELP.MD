@@ -70,7 +70,7 @@ python path_to_submit.py --bashrcpath=bashrcpath --jobinfofilepath=jobinfofilepa
 * If extra info like ram,scratchspace,numproc are included, then multiple jobs can be assigned to a node (CPU only). All available resources (ram,scratch,cpus) are left with 20% of the currently available amount (not total possible). 
 * Also, there is a program number exception list that is hardcoded to prevent more than a total number of this program being executed across the entire cluster at any given time to prevent network bottlenecks.
 * A while loop continuously checks each nodes list of assigned jobs and checks if the subprocess has exited on that node, then resubmits new jobs until the total number of jobs have been finished. 
-* Multiple instances of the dameon are not allowed to run simultaneously. If the program is called while an instance is already running, the input jobs are just added to the existing job queue and then the second instance will exit.
+* Multiple instances of the dameon are not allowed to run simultaneously. If the program is called while an instance is already running, the input jobs are just added to the existing job queue and then the second instance will exit. If the file daemon.pid exists, then the daemon will not start again (except to submit more jobs to queue, or to print which nodes are available).
 * Errors are appended to errorlogger.txt 
 * Finished jobs (normal termination) are appended to finishedlogger.txt
 ## CPU Program List
