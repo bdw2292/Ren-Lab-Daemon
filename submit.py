@@ -676,7 +676,7 @@ def SubmitJob(node,jobpath,bashrcpath,job,loghandle,jobtoprocess,jobtoscratchdir
         jobinfo=RemoveJobInfoFromQueue(jobinfo,jobtoprocess)
     return jobtoprocess,jobinfo
 
-def PollProcess(jobtoprocess,job,finishedjoblist,loghandle,polledjobs,currenttime,mastererrorloghandle):
+def PollProcess(jobtoprocess,job,finishedjoblist,loghandle,polledjobs,currenttime,mastererrorloghandle,masterfinishedloghandle):
     process=jobtoprocess[job]
     poll=process.poll()
     polledjobs.append(job)
@@ -720,7 +720,7 @@ def SubmitJobs(cpunodetojoblist,gpunodetojoblist,inputbashrcpath,sleeptime,jobto
     while len(finishedjoblist)!=jobnumber:
         jobtoprocess,jobinfo=SubmitJobsLoop(cpunodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjoblist,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths)
         jobtoprocess,jobinfo=SubmitJobsLoop(gpunodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjoblist,nodetoosversion,gpunodetocudaversion,ostocudaversiontobashrcpaths)
-        finishedjoblist,jobtoprocess,currenttime,mastererrorloghandle=CheckJobTermination(jobtoprocess,finishedjoblist,jobtologhandle,currenttime,mastererrorloghandle)
+        finishedjoblist,jobtoprocess,currenttime,mastererrorloghandle=CheckJobTermination(jobtoprocess,finishedjoblist,jobtologhandle,currenttime,mastererrorloghandle,masterfinishedloghandle)
         time.sleep(sleeptime)
         WriteToLogFile('*************************************')
         cpunodes,gpucards,nodetoosversion,gpunodetocudaversion,cpunodesactive,gpucardsactive=GrabCPUGPUNodes()
@@ -770,14 +770,14 @@ def SubmitJobsLoop(nodetojoblist,jobtologhandle,jobinfo,jobtoprocess,finishedjob
     return jobtoprocess,jobinfo
 
 
-def CheckJobTermination(jobtoprocess,finishedjoblist,jobtologhandle,currenttime,mastererrorloghandle):
+def CheckJobTermination(jobtoprocess,finishedjoblist,jobtologhandle,currenttime,mastererrorloghandle,masterfinishedloghandle):
     polledjobs=[]
     dellist=[]
     totalnormaltermjobs=[]
     for job in jobtoprocess.keys():
         if job not in polledjobs and job not in finishedjoblist:
             loghandle=jobtologhandle[job]
-            finishedjoblist,polledjobs,jobtodelete,normaltermjobs,currenttime,mastererrorloghandle=PollProcess(jobtoprocess,job,finishedjoblist,loghandle,polledjobs,currenttime,mastererrorloghandle)
+            finishedjoblist,polledjobs,jobtodelete,normaltermjobs,currenttime,mastererrorloghandle=PollProcess(jobtoprocess,job,finishedjoblist,loghandle,polledjobs,currenttime,mastererrorloghandle,masterfinishedloghandle)
             dellist.extend(jobtodelete)
             totalnormaltermjobs.extend(normaltermjobs)
     for job in dellist:
