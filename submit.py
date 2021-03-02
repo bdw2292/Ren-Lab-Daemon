@@ -304,6 +304,7 @@ def CheckBashrcPathsAllNodes(nodes,nodetoosversion,gpunodetocudaversion,ostocuda
 
 def CheckRAM(node):
     ram=False
+    total=False
     cmdstr='free -g'
     output=CheckOutputFromExternalNode(node,cmdstr)
     if output!=False:
@@ -312,10 +313,15 @@ def CheckRAM(node):
             linesplit=line.split()
             if 'Mem' in line:
                 ram=float(linesplit[3])
+                total=float(linesplit[1])
             elif 'buffers/cache' in line:
-                ram=float(linesplit[3]) 
-    amounttopreserve=preserveresourceratio*ram
+                ram=float(linesplit[3])
+                total=float(linesplit[1])
+
+    amounttopreserve=preserveresourceratio*total
     ram=ram-amounttopreserve
+    if ram<0:
+        ram=0
 
     return ram
 
@@ -334,8 +340,10 @@ def CheckCPUs(node):
     currentproc=CheckCurrentCPUUsage(node)
     if type(totalproc)==int and type(currentproc)==int:
         proc=totalproc-currentproc
-        amounttopreserve=int(preserveresourceratio*proc)
+        amounttopreserve=int(preserveresourceratio*totalproc)
         proc=proc-amounttopreserve
+        if proc<0:
+            proc=0
     return proc
 
 def CheckTotalCPU(node):
@@ -557,6 +565,7 @@ def DistributeJobsToNodes(nodes,jobs,jobtoscratchspace,nodetoosversion,gpunodeto
 def CheckScratchSpace(node):
     cmdstr='df -h'
     scratchavail=False
+    scratchtotal=False
     output=CheckOutputFromExternalNode(node,cmdstr)
     if output!=False:
         lines=output.split('\n')[1:-1]
