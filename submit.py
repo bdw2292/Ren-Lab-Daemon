@@ -315,8 +315,9 @@ def CheckRAM(node):
                 ram=float(linesplit[3])
                 total=float(linesplit[1])
             elif 'buffers/cache' in line:
+                print('node',node)
                 ram=float(linesplit[3])
-                total=float(linesplit[1])
+                total=float(linesplit[2])
 
     amounttopreserve=preserveresourceratio*total
     ram=ram-amounttopreserve
