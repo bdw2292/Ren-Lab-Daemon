@@ -204,7 +204,6 @@ def CheckGPUStats(node):
     cardcount=-1
     nodedead=False
     if nodedead==False and cpunodesonly==False:
-        cardcount=0
         lines=output.split('\n')
         for line in lines:
             linesplit=line.split()
@@ -315,9 +314,9 @@ def CheckRAM(node):
                 ram=float(linesplit[3])
                 total=float(linesplit[1])
             elif 'buffers/cache' in line:
-                print('node',node)
                 ram=float(linesplit[3])
-                total=float(linesplit[2])
+                used=float(linesplit[2])
+                total=ram+used
 
     amounttopreserve=preserveresourceratio*total
     ram=ram-amounttopreserve
