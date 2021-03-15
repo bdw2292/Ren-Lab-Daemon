@@ -102,6 +102,14 @@ python createpoltypeinputs.py /home/bdw2292/TestDaemonSubmissionScript/TestMolec
 ```
 
 ## Creating workers for ForceBalance cluster submission
+* Create conda env for ForceBalance
+```
+conda create --name FB17 python=3.7
+conda activate FB17
+conda install --strict-channel-priority -c conda-forge forcebalance
+conda install -c conda-forge ndcctools --yes
+```
+* Until changes are pushed to main branch, use /home/bdw2292/forcebalance/ , includes modifications for GPU tinker.
 * assignworkersforcebalance will source GPU/CPU tinker enviorments from available nodes (found by --listavailnodes) and call forcebalance on NOVA, while calling work_queue_worker on worker nodes to obtain jobs from NOVA.
 * masterhost is NOVA, run program on NOVA
 * Make sure TINKERPATH to binaries is in envpath file for each node.
