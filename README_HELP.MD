@@ -6,7 +6,7 @@
 * jobinfofilepath is required argument
 * cpunodesonly and gpunodesonly are optional arguments to reduce time pinging nodes for information in cluster 
 * verbosemode is optional argument to see progress bars in output file (in nohup to or standard out)
-* listavailnodes will list available nodes in the files 'availablecpunodes.txt' and 'availablegpunodes.txt' then exit
+* listavailnodes will list available nodes in the files 'availablecpunodes.txt' and 'availablegpunodes.txt' then exit. Delete these files before running this same command again (check available nodes at later time).
 * redocrashedjobs will check the output errorlog and redo only those jobs also found in jobinfofilepath 
 ```
 python path_to_submit.py --jobinfofilepath=jobinfofilepath
@@ -99,4 +99,13 @@ python path_to_submit.py --bashrcpath=bashrcpath --jobinfofilepath=jobinfofilepa
 ```
 python createpoltypeinputs.py PoltypeStructuresFolder OutputFilePath PoltypePath RamForAllJobs DiskForAllJobs CPUForAllJobs
 python createpoltypeinputs.py /home/bdw2292/TestDaemonSubmissionScript/TestMolecules /home/bdw2292/TestDaemonSubmissionScript /home/bdw2292/currentstable/PoltypeModules/poltype.py 15GB 100GB 4
+```
+
+## Creating workers for ForceBalance cluster submission
+* assignworkersforcebalance will source GPU/CPU tinker enviorments from available nodes (found by --listavailnodes) and call forcebalance on NOVA, while calling work_queue_worker on worker nodes to obtain jobs from NOVA.
+* masterhost is NOVA, run program on NOVA
+* Make sure TINKERPATH to binaries is in envpath file for each node.
+* Make sure analyze,minimize,dynamic and dynamic_omm have symbolic links in TINKERPATH directory for all nodes, since ForceBalance uses analyze and dynamic rather than dynamic_omm.x or analyze.x. For example (link -s dynamic_omm.x dynamic_omm, ln -s /home/liuchw/Softwares/tinkers/Tinker-latest/source-C8/analyze.x analyze,ln -s /home/liuchw/Softwares/tinkers/Tinker-latest/source-C8/minimize.x minimize,ln -s /home/liuchw/Softwares/tinkers/Tinker-latest/source-C8/dynamic.x dynamic)
+``` 
+nohup python assignworkersforcebalance.py /home/bdw2292/.FB.bashrc /home/bdw2292/ExternalAPIRenLab/availablegpunodes.txt /home/bdw2292/FB_Test/example.in 9123 nova /home/bdw2292/.poltype_OS_6-7.bashrc &
 ```
