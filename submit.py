@@ -265,7 +265,8 @@ def ReadNodeList(nodelistfilepath):
         temp=open(nodelistfilepath,'r')
         results=temp.readlines()
         for line in results:
-
+            if len(linesplit)<1:
+                continue
             newline=line.replace('\n','')
             if '#' not in line:
                 linesplit=newline.split()
